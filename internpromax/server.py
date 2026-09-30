@@ -56,7 +56,8 @@ def _scheduler(stop: threading.Event) -> None:
             if time.time() - last > float(settings.get("sync_interval_hours") or 6) * 3600:
                 run_sync()
             imap = settings.get("imap") or {}
-            if imap.get("enabled") and time.time() - last_imap > float(imap.get("interval_minutes") or 30) * 60:
+            configured = imap.get("host") and imap.get("username") and imap.get("password")
+            if imap.get("enabled") and configured and time.time() - last_imap > float(imap.get("interval_minutes") or 30) * 60:
                 last_imap = time.time()
                 try:
                     inbox.imap_sync()

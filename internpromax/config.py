@@ -36,6 +36,7 @@ DEFAULT_SETTINGS = {
     "auto_tailor_on_apply": True,
     "use_tailored_resume": True,
     "autofill_on_load": True,
+    "tailor_any_site": True,
     "ai_model": "claude-opus-5-5",
     "ai_effort": "medium",
     "anthropic_api_key": "",

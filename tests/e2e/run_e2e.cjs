@@ -168,11 +168,53 @@ function staticServer() {
     check("Workday: confirmation popup marked Applied", !!wdApp);
     await wd.screenshot({ path: path.join(OUT, "workday-done.png") });
 
-    // ---------- 4. Tracker shows all three
+    // ---------- 4. A job that isn't on any list: posting page, then a separate apply page
+    const CAREERS = `http://careers.initrode.test:${SITE_PORT}`;
+    const ext = await context.newPage();
+    await ext.goto(`${CAREERS}/careers-jd.html`);
+    await sleep(2500); // lets the extension remember the posting
+    await Promise.all([ext.waitForURL(/careers-apply/), ext.click("#apply")]);
+    const extJob = await until(async () => (await getJSON(`/api/jobs/lookup?url=${encodeURIComponent(`${CAREERS}/careers-jd.html`)}`)).job, 15000);
+    check("unlisted job created from the posting you viewed", !!extJob && extJob.source === "extension", extJob ? `${extJob.company} | ${extJob.title}` : "");
+    if (extJob) {
+      check("company and title read from the posting", extJob.company === "Initrode Aerospace" && extJob.title === "Propulsion Engineering Intern");
+      const extFilled = await until(() => ext.evaluate(() => document.querySelector("#fn").value === "Alex" && document.querySelector("#auth").value === "Yes"), 15000);
+      check("unlisted job: form autofilled", !!extFilled);
+      const extDetails = await until(async () => { const d = await getJSON(`/api/jobs/${extJob.id}`); return d.details?.status === "ready" && d.details; }, 30000, 500);
+      check("unlisted job: posting analyzed", !!extDetails && extDetails.analysis.required_skills.includes("CAD"), extDetails ? extDetails.analysis.required_skills.join(", ") : "");
+      await until(() => ext.evaluate(() => document.querySelector("#cv").files.length === 1), 60000, 500);
+      const extTailored = await until(async () => (await getJSON(`/api/jobs/${extJob.id}`)).resume?.status === "ready", 30000, 500);
+      const extPdf = Buffer.from(await (await fetch(`${API}/api/jobs/${extJob.id}/resume.pdf?variant=tailored`)).arrayBuffer());
+      const extBytes = await ext.evaluate(async () => Array.from(new Uint8Array(await document.querySelector("#cv").files[0].arrayBuffer())));
+      check("unlisted job: tailored resume attached", !!extTailored && extBytes.length === extPdf.length, `${extBytes.length} vs ${extPdf.length} bytes`);
+      await ext.screenshot({ path: path.join(OUT, "unlisted-apply.png") });
+      await Promise.all([ext.waitForURL(/confirmation\.html/), ext.click("button[type=submit]")]);
+      const extApp = await until(async () => (await getJSON("/api/applications")).items.find((a) => a.job_id === extJob.id && a.status === "applied"), 15000);
+      check("unlisted job: submission tracked", !!extApp, extApp ? extApp.company : "");
+    }
+
+    // ---------- 5. Application form embedded in an iframe on the company's page
+    const emb = await context.newPage();
+    await emb.goto(`http://jobs.umbrella.test:${SITE_PORT}/embed-jd.html`);
+    const frame = await until(() => emb.frames().find((f) => f.url().includes("embed-form.html")), 10000);
+    const embFilled = frame && await until(() => frame.evaluate(() => document.querySelector("#email").value === "alex.rivera@example.edu"), 15000);
+    check("embedded form: autofilled inside the iframe", !!embFilled);
+    const embJob = await until(async () => (await getJSON(`/api/jobs/lookup?url=${encodeURIComponent(`http://jobs.umbrella.test:${SITE_PORT}/embed-jd.html`)}`)).job, 15000);
+    check("embedded form: job created from the surrounding page", !!embJob, embJob ? `${embJob.company} | ${embJob.title}` : "");
+    if (embJob && frame) {
+      await until(() => frame.evaluate(() => document.querySelector("#resume").files.length === 1), 60000, 500);
+      await until(async () => (await getJSON(`/api/jobs/${embJob.id}`)).resume?.status === "ready", 30000, 500);
+      const embPdf = Buffer.from(await (await fetch(`${API}/api/jobs/${embJob.id}/resume.pdf?variant=tailored`)).arrayBuffer());
+      const embBytes = await frame.evaluate(async () => Array.from(new Uint8Array(await document.querySelector("#resume").files[0].arrayBuffer())));
+      check("embedded form: tailored resume attached in the iframe", embBytes.length === embPdf.length, `${embBytes.length} vs ${embPdf.length} bytes`);
+      await emb.screenshot({ path: path.join(OUT, "embedded.png") });
+    }
+
+    // ---------- 6. Tracker shows everything applied
     await dash.goto(`${API}/#/tracker`);
     await dash.waitForSelector(".app-card");
     const cards = await dash.locator(".col[data-status=applied] .app-card").count();
-    check("tracker board shows 3 applied", cards === 3, String(cards));
+    check("tracker board shows 4 applied", cards === 4, String(cards));
     await dash.screenshot({ path: path.join(OUT, "tracker.png") });
 
     if (logs.length) console.log("page console errors:\n  " + logs.join("\n  "));

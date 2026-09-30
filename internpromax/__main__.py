@@ -20,6 +20,8 @@ def main() -> None:
     sync.add_argument("--force", action="store_true", help="ignore the cached ETag")
     imp = sub.add_parser("import", help="import a listings.json file from disk")
     imp.add_argument("file")
+    lp = sub.add_parser("load-profile", help="replace your profile with a JSON file (a profile or an export)")
+    lp.add_argument("file")
     an = sub.add_parser("analyze", help="fetch + analyze one job posting and print the result")
     an.add_argument("job_id")
     args = parser.parse_args()
@@ -33,6 +35,20 @@ def main() -> None:
         from . import ingest
 
         print(json.dumps(ingest.import_file(args.file), indent=2))
+    elif args.cmd == "load-profile":
+        from . import db, profile
+
+        with open(args.file, encoding="utf-8") as fh:
+            data = json.load(fh)
+        if "profile" in data and "personal" not in data:
+            data = data["profile"]
+        with db.session() as conn:
+            saved = profile.save(conn, data)
+            done = profile.completeness(saved)
+        res = saved["resume"]
+        print(f"Loaded profile for {saved['personal'].get('first_name', '')} {saved['personal'].get('last_name', '')}: "
+              f"{len(res['experience'])} experiences, {len(res['projects'])} projects, {len(res['activities'])} activities, "
+              f"{sum(len(g['items']) for g in res['skills'])} skills ({done['score']}% complete)")
     elif args.cmd == "analyze":
         from . import pipeline
 

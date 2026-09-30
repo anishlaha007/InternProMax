@@ -73,7 +73,8 @@ export async function renderSettings(main, refreshNav) {
         bool(S, "auto_analyze_on_apply", "Analyze the posting automatically", "Pulls the full description and extracts required skills, projects they want, constraints and your gaps."),
         bool(S, "auto_tailor_on_apply", "Tailor my resume automatically", "Builds a tailored version from your master resume while the application page loads."),
         bool(S, "use_tailored_resume", "Upload the tailored resume in forms (falls back to your uploaded file)"),
-        bool(S, "autofill_on_load", "Autofill as soon as an application form is detected", "Otherwise click Autofill in the extension panel."))),
+        bool(S, "autofill_on_load", "Autofill as soon as an application form is detected", "Otherwise click Autofill in the extension panel."),
+        bool(S, "tailor_any_site", "Work on any job site, not just jobs from your lists", "When you open an application anywhere, the extension reads the posting on the page (or the one you just viewed), adds the job to your tracker, and tailors your resume to it before attaching it."))),
 
     h("div", { class: "card" }, h("h2", {}, "AI (Claude)"),
       h("p", { class: "small muted" }, "Optional. Without a key, the built-in analyzer and tailoring still work. With a key, Claude reads postings like a recruiter, rewrites bullets toward what each posting wants (never inventing anything), drafts answers to free-text questions, and classifies unclear emails."),

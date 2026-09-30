@@ -174,7 +174,8 @@ def get_profile():
         settings = db.get_settings(conn)
         return {"profile": p, "completeness": profile_mod.completeness(p), "resume_file": _resume_file_meta(conn),
                 "skills": profile_mod.all_skills(p), "ai": ai.available(settings),
-                "flags": {k: settings.get(k) for k in ("use_tailored_resume", "autofill_on_load", "auto_tailor_on_apply", "auto_analyze_on_apply")}}
+                "flags": {k: settings.get(k) for k in ("use_tailored_resume", "autofill_on_load", "auto_tailor_on_apply",
+                                                        "auto_analyze_on_apply", "tailor_any_site")}}
 
 
 @app.put("/api/profile")
@@ -347,7 +348,9 @@ def list_jobs(view: str = "matches", q: str = "", term: str = "", category: str 
             continue
         if category and job["category"] != category:
             continue
-        filtered = m.hard_filters(job)
+        if job["source"] == ingest.EXTERNAL_SOURCE and not row["app_status"]:
+            continue
+        filtered = [] if job["source"] == ingest.EXTERNAL_SOURCE else m.hard_filters(job)
         hidden = bool(row["hidden"])
         app_status = row["app_status"]
         applied = app_status not in (None, "saved")
@@ -488,6 +491,39 @@ def capture_description(job_id: str, payload: dict = Body(...)):
     else:
         pipeline.queue(job_id, "analyze", force=True)
     return {"stored": True}
+
+
+@app.post("/api/jobs/external")
+def external_job(payload: dict = Body(...)):
+    """The extension found an application for a job that isn't on your lists (or not yet linked)."""
+    urls = [u for u in (payload.get("posting_url"), payload.get("url")) if u and re.match(r"https?://", u)]
+    if not urls:
+        raise HTTPException(400, "A posting URL is required")
+    found = next((j for j in (lookup(u)["job"] for u in urls) if j), None)
+    with db.session() as conn:
+        job = found or ingest.add_external(conn, url=urls[0], company=payload.get("company") or "",
+                                           title=payload.get("title") or "", location=payload.get("location") or "")
+        job = job_from_row(job) if not found else job
+        conn.execute("INSERT INTO job_state(job_id, opened_at) VALUES(?, ?) ON CONFLICT(job_id) DO UPDATE SET opened_at=excluded.opened_at",
+                     (job["id"], db.now()))
+        details = pipeline.get_details(conn, job["id"])
+        settings = db.get_settings(conn)
+        app_row = tracker.find(conn, job_id=job["id"])
+    text = (payload.get("description") or "").strip()
+    stored = False
+    if len(text) >= 200 and not details.get("description"):
+        pipeline.store_description(job["id"], text, payload.get("source") or "page")
+        with db.session() as conn:
+            pipeline.set_details(conn, job["id"], analysis=None, analysis_method=None, analyzed_at=None)
+        stored = True
+    queued = None
+    if settings.get("auto_tailor_on_apply"):
+        pipeline.queue(job["id"], "tailor")
+        queued = "tailor"
+    elif settings.get("auto_analyze_on_apply"):
+        pipeline.queue(job["id"], "analyze")
+        queued = "analyze"
+    return {"job": job, "created": not found, "description_stored": stored, "queued": queued, "application": app_row}
 
 
 @app.post("/api/jobs/{job_id}/analyze")

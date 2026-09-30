@@ -21,6 +21,7 @@ The design and scope are in [docs/SCOPE.md](docs/SCOPE.md).
 | **Reads the posting** | For each job you pursue it pulls the full description (Greenhouse, Lever, Ashby, Workday and SmartRecruiters APIs, schema.org data, or the page itself via the extension). It extracts required vs. nice-to-have skills, what you'd work on, **the kinds of projects/experience they want**, hard requirements (graduation window, GPA, work authorization), your matched and missing skills, and a fit score. |
 | **Tailors your resume** | Starts from your "master resume" (everything you've done). It leads with the most relevant experience and projects, rewrites bullets toward what the posting asks for, puts matching skills first, and renders a clean one-page, ATS-friendly PDF. It **never invents anything**: entries are rebuilt from your master copy, rewritten bullets that add numbers you never wrote are reverted, and skills you don't list are dropped. Every change is listed for you. |
 | **Autofills applications** | The Chrome extension fills name, contact, links, address, school/degree/major/GPA/graduation, current employer, work authorization, sponsorship, 18+, relocation, "how did you hear", EEO questions and saved answers. It attaches the tailored PDF and drafts free-text answers with AI if you want. It works on Greenhouse, Lever, Ashby and Workday-style forms, plus generic forms. It never overwrites what you typed, and **you** click Submit. |
+| **Works on any job site** | You don't need the job to be on a list. When you open an application anywhere (company careers page, LinkedIn → company site, an embedded form), the extension reads the posting on the page, or the one you viewed just before clicking Apply. It adds the job to your tracker, analyzes the requirements, tailors your resume, and attaches that version while it fills the form. |
 | **Tracks automatically** | When you submit and the confirmation page appears ("Thank you for applying", `/confirmation`, …), the application is marked **Applied** with a timestamp. "Mark applied" is always one click away. |
 | **Email → status** | Paste a recruiter email, or connect your inbox over IMAP (Gmail app passwords work). It detects rejections, online assessments, interview invites, offers and "application received" emails, then matches each to the right application. It suggests the status change, or applies it automatically if you opt in, and never moves an application backwards. |
 
@@ -51,6 +52,7 @@ Chrome will say the extension can "read and change data on all websites". It nee
 **Profile** tab:
 - **Basics / Education / Authorization & EEO**: used for autofill and filtering. EEO answers default to "decline".
 - **Job preferences**: terms (Summer 2027 + the 2027 off-season terms for co-ops are on by default), categories, role interests, locations ("Bay Area", "NYC", "CA", "Remote", "Canada"…), keywords to boost or exclude, dream companies.
+- **Already have a profile file?** Click **Load profile file** (top right of Profile), or run `python -m internpromax load-profile my-profile.json`.
 - **Master resume**: upload your PDF (it's attached when there's no tailored version) and click **Import into profile** (full import with AI, skills-only without). Then list *all* your experience, projects, activities and skills. Tailored resumes pick from this and never add to it.
 - **Application answers**: common answers plus an answer bank for recurring questions.
 
@@ -59,6 +61,7 @@ Chrome will say the extension can "read and change data on all websites". It nee
 1. **Jobs**: new matches first, best score on top. Click a job to see *why* it matched, **Analyze posting**, and **Tailor my resume** (preview, edit text, download PDF).
 2. **Apply**: opens the posting in a tab the extension links to the job. The posting is analyzed and your tailored resume generated in the background. The form is filled and the tailored PDF attached.
 3. Answer what's left (the panel lists the questions that need you) and click **Submit**. The job moves to **Applied**.
+   Found a job somewhere else? Just open its application. The extension builds the job from the page, tailors your resume and fills the form the same way.
 4. **Inbox**: paste recruiter emails, or let IMAP sync find them, and accept the suggested status changes.
 5. **Tracker**: board or list view with response rate, interviews and offers. Drag cards between stages and keep notes and a timeline per application.
 

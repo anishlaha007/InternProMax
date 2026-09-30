@@ -36,8 +36,19 @@
     return IPM.applicationScore() >= 4;
   }
 
-  async function activate(reason) {
-    if (active) return;
+  let activation = null;
+  function activate(reason) {
+    activation = activation || doActivate(reason);
+    return activation;
+  }
+
+  let preparing = null;
+  function ensurePrepared() {
+    preparing = preparing || prepareExternalJob();
+    return preparing;
+  }
+
+  async function doActivate(reason) {
     active = true;
     ctx = await send({ type: "GET_CONTEXT", url: location.href });
     if (ctx.error && !ctx.apiOk) ctx = { apiOk: false };
@@ -46,6 +57,11 @@
     if (TOP && (formHere || ctx.job || reason === "form-in-frame")) showPanel();
     // Capture the posting first so the server can tailor the resume before we attach one.
     if (TOP) await maybeCaptureDescription();
+    // Not a job from your lists? Build one from this page (or the posting you just viewed) and tailor for it.
+    const formInTab = formHere || reason === "form-in-frame";
+    if (TOP && formInTab && !ctx.job && ctx.apiOk && ctx.flags?.tailor_any_site !== false && !ctx.tab?.applied) {
+      await ensurePrepared();
+    }
     if (ctx.tab && ctx.tab.submitAttemptAt && Date.now() - ctx.tab.submitAttemptAt < 3 * 60 * 1000 && !ctx.tab.applied) {
       // A submit happened on the previous page in this tab: is this the confirmation page?
       preSubmitConfirm = false;
@@ -57,8 +73,21 @@
     }
   }
 
+  const JOB_WORDS = /\b(intern(ship)?|co-?op|engineer(ing)?|developer|analyst|scientist|designer|manager|associate|specialist|researcher|technician|fellow)\b/i;
+
   function guessJob() {
-    const title = document.querySelector("h1")?.innerText?.trim() || document.title;
+    // Common page-title shapes: "Job Application for X at Y" (Greenhouse), "X @ Y" (Ashby), "Y - X" (Lever).
+    const t = (document.title || "").trim();
+    let m = t.match(/^job application for (.+?) at (.+)$/i) || t.match(/^(.+?) @ (.+)$/);
+    if (m) return { title: m[1].trim().slice(0, 120), company: m[2].trim().slice(0, 80) };
+    m = t.match(/^(.+?)\s+[-–|]\s+(.+)$/);
+    if (m) {
+      const [a, b] = [m[1].trim(), m[2].replace(/\b(careers?|jobs?)\b.*$/i, "").trim()];
+      if (JOB_WORDS.test(a) && b && !JOB_WORDS.test(b)) return { title: a.slice(0, 120), company: b.slice(0, 80) };
+      if (JOB_WORDS.test(b) && a && !JOB_WORDS.test(a)) return { title: b.slice(0, 120), company: a.slice(0, 80) };
+    }
+    const h1 = document.querySelector("h1")?.innerText?.trim();
+    const title = h1 && JOB_WORDS.test(h1) ? h1 : (h1 || t);
     const og = document.querySelector('meta[property="og:site_name"]')?.content;
     const host = location.hostname.replace(/^www\./, "");
     const parts = location.pathname.split("/").filter(Boolean);
@@ -82,6 +111,7 @@
       onConfirm: (yes) => { IPM.panel.update({ askConfirm: false }); if (yes) markApplied("confirmed-by-you"); },
       onOpenDashboard: () => send({ type: "OPEN_DASHBOARD", jobId: ctx.job?.id }),
       onUseBase: () => { useBaseNow = true; },
+      onTailor: () => tailorNow(),
     });
   }
 
@@ -118,14 +148,20 @@
 
   let resumeTried = null; // the input we already tried, so DOM churn doesn't refetch
 
-  async function uploadResume() {
+  async function uploadResume(replace = false) {
     if (resumeDone) return;
     const inputs = IPM.resumeInputs();
     if (!inputs.length) return;
     const input = inputs[0];
-    if (input.files && input.files.length) { resumeDone = true; return; }
+    const ours = IPM.filledElements.has(input);
+    if (input.files && input.files.length && !(replace && ours)) { resumeDone = true; return; }
     if (resumeTried === input) return;
     resumeTried = input;
+    if (!TOP && !ctx.job && ctx.flags?.tailor_any_site !== false) {
+      // Embedded form: let the top page create the job (and start tailoring) before picking a resume.
+      const r = await send({ type: "ENSURE_JOB" });
+      if (r.job) ctx.job = r.job;
+    }
     const setResume = (text) => TOP ? IPM.panel.update({ resume: text }) : send({ type: "FILL_REPORT", report: { resume: text } });
     let res = await send({ type: "GET_RESUME", jobId: ctx.job?.id });
     const started = Date.now();
@@ -140,6 +176,10 @@
     const file = new File([bytes], res.name || "Resume.pdf", { type: res.type || "application/pdf" });
     const ok = await IPM.uploadFile(input, file);
     resumeDone = ok;
+    if (TOP) {
+      IPM.panel.update({ resumeVariant: ok ? res.variant : null, canTailor: !!ctx.job || ctx.flags?.tailor_any_site !== false });
+      if (ok && res.variant === "tailored" && /being tailored/.test(IPM.panel.state.message || "")) IPM.panel.update({ message: "Added to your tracker." });
+    }
     setResume(ok ? `${res.variant === "tailored" ? "tailored version" : "your resume"} attached ✓` : "couldn’t attach automatically");
   }
 
@@ -253,44 +293,121 @@
 
   // ---------------------------------------------------------------- posting capture
 
-  async function maybeCaptureDescription() {
-    if (!ctx?.job || !ctx.needsDescription) return;
-    let text = "";
+  // Read the job posting on this page: schema.org JobPosting data first, then the visible text.
+  function extractPosting() {
+    const out = { text: "", title: "", company: "", location: "", source: "page" };
     for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
       try {
         const data = JSON.parse(s.textContent);
-        const nodes = Array.isArray(data) ? data : [data, ...(data["@graph"] || [])];
+        const nodes = (Array.isArray(data) ? data : [data]).flatMap((n) => [n, ...((n && n["@graph"]) || [])]);
         const jp = nodes.find((n) => n && String(n["@type"]).includes("JobPosting"));
-        if (jp?.description) {
+        if (!jp) continue;
+        if (jp.description) {
           // DOMParser builds an inert document: nothing loads or runs.
           const parsed = new DOMParser().parseFromString(jp.description, "text/html");
-          text = (parsed.body.textContent || "").replace(/\s+\n/g, "\n").trim();
-          break;
+          out.text = (parsed.body.innerText || parsed.body.textContent || "").replace(/\s+\n/g, "\n").trim();
         }
+        out.title = jp.title || "";
+        out.company = (jp.hiringOrganization && jp.hiringOrganization.name) || "";
+        const addr = [].concat(jp.jobLocation || [])[0]?.address;
+        if (addr) out.location = [addr.addressLocality, addr.addressRegion].filter(Boolean).join(", ");
+        out.source = "json-ld";
+        break;
       } catch { /* ignore malformed JSON-LD */ }
     }
-    if (!text) {
+    if (!out.text) {
       const main = document.querySelector("main, article, [role=main], #content, .content") || document.body;
-      text = (main.innerText || "").trim();
+      out.text = ((main && main.innerText) || "").trim();
     }
-    const hints = (text.match(JD_HINT) || []).length;
-    if (text.length > 400 && hints >= 2) await send({ type: "CAPTURE_DESCRIPTION", jobId: ctx.job.id, text: text.slice(0, 50000) });
+    out.text = out.text.slice(0, 50000);
+    out.hints = (out.text.match(JD_HINT) || []).length;
+    const g = guessJob();
+    out.title = out.title || g.title;
+    out.company = out.company || g.company;
+    return out;
+  }
+
+  const looksLikePosting = (p) => (p.source === "json-ld" ? p.text.length > 200 : p.text.length > 400 && p.hints >= 2);
+
+  async function maybeCaptureDescription() {
+    if (!ctx?.job || !ctx.needsDescription) return;
+    const p = extractPosting();
+    if (looksLikePosting(p)) await send({ type: "CAPTURE_DESCRIPTION", jobId: ctx.job.id, text: p.text });
+  }
+
+  async function prepareExternalJob() {
+    const p = extractPosting();
+    const posting = looksLikePosting(p) ? p : null;
+    const guess = (IPM.panel.mounted && IPM.panel.state.guess) || {};
+    IPM.panel.update({ preparing: true, message: "Reading the job posting and tailoring your resume for it…" });
+    const res = await send({
+      type: "CREATE_EXTERNAL_JOB", url: location.href,
+      company: (posting && posting.company) || guess.company || p.company, title: (posting && posting.title) || guess.title || p.title,
+      location: p.location, description: posting ? posting.text : "",
+    });
+    if (res.job) {
+      ctx.job = res.job;
+      if (res.application) ctx.application = res.application;
+      IPM.panel.update({ job: res.job, guess: null, preparing: false, application: res.application || null,
+        message: res.created ? "Added to your tracker. Your resume is being tailored to this posting." : null });
+    } else {
+      IPM.panel.update({ preparing: false, message: res.error ? `Couldn’t read this posting: ${res.error}` : null });
+    }
+  }
+
+  // Remember postings you look at, so the application page (often a different URL) can be tailored to them.
+  function stashPostingIfAny() {
+    const hasJsonLd = !!document.querySelector('script[type="application/ld+json"]');
+    const jobish = /job|career|position|opening|apply|recruit|greenhouse|lever|workday|ashby|smartrecruiters|icims/i.test(location.href + " " + document.title);
+    if (!hasJsonLd && !jobish) return false;
+    const p = extractPosting();
+    if (!looksLikePosting(p)) return false;
+    send({ type: "STASH_POSTING", posting: { url: location.href, text: p.text, title: p.title, company: p.company, location: p.location } });
+    return true;
+  }
+
+  async function tailorNow() {
+    if (!ctx?.job) await ensurePrepared();
+    if (!ctx?.job) return;
+    IPM.panel.update({ resume: "pending" });
+    const res = await send({ type: "TAILOR_JOB", jobId: ctx.job.id });
+    if (res.error) { IPM.panel.update({ resume: `couldn’t tailor (${res.error})` }); return; }
+    resumeDone = false;
+    resumeTried = null;
+    useBaseNow = false;
+    await uploadResume(true);
+    send({ type: "AUTOFILL_FRAMES_RESUME" });
   }
 
   // ---------------------------------------------------------------- messages from background
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg.type === "REUPLOAD_RESUME") {
+      (async () => {
+        if (!TOP && ctx) { resumeDone = false; resumeTried = null; useBaseNow = false; await uploadResume(true); }
+        sendResponse({ ok: true });
+      })();
+      return true;
+    }
     if (msg.type === "DO_AUTOFILL") {
       (async () => {
-        if (!active) await activate("autofill-request");
+        await activate("autofill-request");
         if (looksLikeApplication() || IPM.resumeInputs().length) await runAutofill({ auto: false });
         sendResponse({ ok: true, filled: totalFilled });
       })();
       return true;
     }
     if (!TOP) return false;
+    if (msg.type === "PREPARE_JOB") {
+      (async () => {
+        await activate("form-in-frame");
+        if (!ctx.job && ctx.apiOk && ctx.flags?.tailor_any_site !== false) await ensurePrepared();
+        sendResponse({ job: ctx.job || null });
+      })();
+      return true;
+    }
     if (msg.type === "FORM_FOUND") {
-      if (!active) activate("form-in-frame"); else showPanel();
+      if (!active) activate("form-in-frame"); else { showPanel(); if (!ctx?.job && ctx?.apiOk && ctx.flags?.tailor_any_site !== false) ensurePrepared(); }
     } else if (msg.type === "FILL_REPORT") {
       const r = msg.report || {};
       const patch = {};
@@ -313,6 +430,9 @@
 
   async function boot() {
     const tab = await send({ type: "TAB_STATE" });
+    if (TOP && !tab.jobId) {
+      setTimeout(() => { if (!stashPostingIfAny()) setTimeout(stashPostingIfAny, 3500); }, 1200);
+    }
     if (tab.jobId || looksLikeApplication()) return activate("boot");
     // Single-page apps render forms late: watch for a while.
     let tries = 0;

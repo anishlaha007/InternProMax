@@ -107,3 +107,25 @@ def test_ai_endpoints_need_a_key(client):
 def test_dashboard_is_served(client):
     html = client.get("/").text
     assert "data-ipm-dashboard" in html and "js/app.js" in html
+
+
+def test_external_job_from_any_site(client, posting_text):
+    body = {"url": "https://careers.initech.example/apply?job=42", "posting_url": "https://careers.initech.example/jobs/42",
+            "company": "Initech", "title": "Backend Software Engineer Intern", "description": posting_text}
+    out = client.post("/api/jobs/external", json=body).json()
+    job = out["job"]
+    assert out["created"] and out["description_stored"] and job["id"].startswith("ext-")
+    assert job["url"] == "https://careers.initech.example/jobs/42" and job["category"] == "Software Engineering"
+    again = client.post("/api/jobs/external", json=body).json()
+    assert not again["created"] and again["job"]["id"] == job["id"] and not again["description_stored"]
+    # not in the feed until you act on it, then it shows up as applied
+    assert all(i["id"] != job["id"] for i in client.get("/api/jobs?view=all&limit=500").json()["items"])
+    resume = client.post(f"/api/jobs/{job['id']}/tailor", json={"wait": True}).json()["resume"]
+    assert resume["status"] == "ready"
+    client.post("/api/applications/applied", json={"job_id": job["id"]})
+    assert client.get("/api/jobs?view=applied").json()["items"][0]["id"] == job["id"]
+
+
+def test_external_job_reuses_listed_job(client):
+    out = client.post("/api/jobs/external", json={"url": "https://job-boards.greenhouse.io/acme/jobs/123456#app", "company": "x", "title": "y"}).json()
+    assert out["job"]["id"] in ("a", "b", "c", "d") and not out["created"]

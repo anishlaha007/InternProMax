@@ -84,8 +84,9 @@
         el("input", { value: s.guess?.company || "", placeholder: "Company", "aria-label": "Company", oninput: (e) => { state.guess = { ...state.guess, company: e.target.value }; } }),
         el("input", { value: s.guess?.title || "", placeholder: "Role", "aria-label": "Role", style: "margin-top:5px", oninput: (e) => { state.guess = { ...state.guess, title: e.target.value }; } }));
 
-    const resumeLine = s.resume ? el("div", { class: "small" }, "Resume: ", s.resume === "pending" ? [el("span", { class: "spin" }), " waiting for your tailored resume… ",
-      el("a", { onclick: () => handlers.onUseBase && handlers.onUseBase() }, "use base now")] : s.resume) : null;
+    const resumeLine = s.resume ? el("div", { class: "small" }, "Resume: ", s.resume === "pending" ? [el("span", { class: "spin" }), " tailoring your resume to this posting… ",
+      el("a", { onclick: () => handlers.onUseBase && handlers.onUseBase() }, "use base now")] : [s.resume,
+      s.resumeVariant && s.resumeVariant !== "tailored" && s.canTailor ? [" · ", el("a", { onclick: () => handlers.onTailor && handlers.onTailor() }, "tailor it to this job")] : null]) : null;
 
     const needs = (s.needsYou || []).filter((n) => n.label);
     const body = el("div", { class: "body" },
@@ -97,6 +98,7 @@
           s.busy ? "Filling…" : s.fillCount ? "Fill again" : "Autofill"),
         !s.applied ? el("button", { class: "btn", disabled: !s.apiOk ? "" : null, onclick: () => handlers.onMarkApplied() }, "Mark applied") : null,
         s.dashboard ? el("a", { class: "small", onclick: () => handlers.onOpenDashboard() }, "Dashboard ↗") : null),
+      s.preparing ? el("div", { class: "small" }, el("span", { class: "spin" }), " Reading the job posting on this page…") : null,
       s.fillCount || s.filledNote ? el("div", { class: "small muted" }, s.filledNote || `Filled ${s.fillCount} field${s.fillCount === 1 ? "" : "s"}. Review everything before you submit.`) : null,
       resumeLine,
       needs.length ? el("div", { class: "box small" }, el("b", {}, `${needs.length} question${needs.length === 1 ? "" : "s"} need${needs.length === 1 ? "s" : ""} you`),

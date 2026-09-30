@@ -80,12 +80,15 @@ def parse(url: str | None) -> dict:
             i = segs.index("job")
             site = segs[i - 1] if i >= 1 else None
             rest = segs[i + 1:]
+            if "apply" in rest:
+                rest = rest[: rest.index("apply")]
             out.update(tenant=tenant, site=site, job_path="/".join(rest))
-            last = rest[-1] if rest else ""
-            m = re.search(r"_([A-Za-z]*-?\d[\w-]*)$", last)
-            if m:
-                req = re.sub(r"-\d+$", "", m.group(1))
-                out.update(req_id=req, key=f"wd:{tenant}:{req.lower()}")
+            for seg in reversed(rest):
+                m = re.search(r"_([A-Za-z]*-?\d[\w-]*)$", seg)
+                if m:
+                    req = re.sub(r"-\d+$", "", m.group(1))
+                    out.update(req_id=req, key=f"wd:{tenant}:{req.lower()}")
+                    break
         return out
 
     if host.endswith("smartrecruiters.com"):

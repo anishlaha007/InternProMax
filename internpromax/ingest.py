@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import re
 import sqlite3
 from typing import Any, Iterable
 
@@ -165,6 +167,42 @@ def sync_all(force: bool = False, client: httpx.Client | None = None) -> dict:
         db.kv_set(conn, "source_meta", meta)
         db.kv_set(conn, "last_sync", {"at": db.now(), "results": results})
     return {"at": db.now(), "results": results}
+
+
+EXTERNAL_SOURCE = "extension"
+
+_CATEGORY_HINTS = [
+    ("Data Science, AI & ML", r"data scien|machine learning|\bml\b|\bai\b|analytics|data analyst|data engineer"),
+    ("Quantitative Finance", r"\bquant|trading|trader"),
+    ("Product Management", r"product manag|\bapm\b|program manag"),
+    ("Software Engineering", r"software|developer|full.?stack|back.?end|front.?end|\bweb\b|mobile|devops|\bsre\b"),
+    ("Hardware Engineering", r"hardware|electrical|mechanical|aerospace|propulsion|avionics|embedded|firmware|robot|test|manufactur|thermal|structur|systems engineer|design engineer|controls"),
+]
+
+
+def guess_category(title: str) -> str:
+    low = (title or "").lower()
+    for cat, pat in _CATEGORY_HINTS:
+        if re.search(pat, low):
+            return cat
+    return "Other"
+
+
+def add_external(conn: sqlite3.Connection, *, url: str, company: str, title: str, location: str = "") -> dict:
+    """Create a job for a posting you found anywhere (not on a synced list)."""
+    parsed = ats.parse(url)
+    key = parsed.get("key") or ats.url_key(url) or url
+    job_id = "ext-" + hashlib.sha1(key.encode()).hexdigest()[:12]
+    ts = db.now()
+    row = {
+        "id": job_id, "source": EXTERNAL_SOURCE, "list_source": EXTERNAL_SOURCE,
+        "company": (company or "").strip()[:120] or "Unknown company", "title": (title or "").strip()[:200] or "Application",
+        "category": guess_category(title), "terms": "[]", "locations": json.dumps([location] if location else []),
+        "url": url, "url_key": ats.url_key(url), "ats": parsed.get("ats"), "ats_key": parsed.get("key"), "company_url": None,
+        "sponsorship": "Other", "degrees": "[]", "active": 1, "visible": 1, "date_posted": ts, "date_updated": ts, "now": ts,
+    }
+    conn.execute(UPSERT.replace("company=excluded.company,", "").replace("title=excluded.title,", ""), row)
+    return dict(conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone())
 
 
 def import_file(path: str, source_url: str = "local-file") -> dict:

@@ -278,7 +278,7 @@ export async function renderProfile(main, refreshNav) {
   clear(main,
     h("div", { class: "page-head" },
       h("div", {}, h("h1", {}, "Your profile"), h("div", { class: "sub" }, "Everything used to rank jobs, fill applications and tailor your resume. Stored only on this computer.")),
-      completeness),
+      h("div", { class: "row" }, completeness, loadButton(refreshNav, () => renderProfile(main, refreshNav)))),
     tabsEl, body,
     h("div", { class: "sticky-save" }, h("div", { class: "inner" },
       h("span", { class: "small muted" }, "Changes aren’t saved until you click Save."),
@@ -306,3 +306,25 @@ function entryFields() {
   ];
 }
 function blankEntry() { return { company: "", title: "", location: "", start: "", end: "", bullets: [], skills: [] }; }
+
+function loadButton(refreshNav, rerender) {
+  // Replace the whole profile from a JSON file (e.g. one generated from your resume, or an export).
+  const input = h("input", { type: "file", accept: ".json,application/json", class: "hidden" });
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    input.value = "";
+    if (!file) return;
+    let data;
+    try {
+      data = JSON.parse(await file.text());
+    } catch {
+      toast("That file isn’t valid JSON", "bad");
+      return;
+    }
+    const prof = data.profile && !data.personal ? data.profile : data;
+    if (!prof.personal && !prof.resume) { toast("That file doesn’t look like an InternProMax profile", "bad"); return; }
+    if (!confirm(`Replace your current profile with ${file.name}?`)) return;
+    if (await guard(() => api.put("/api/profile", { profile: prof }), "Profile loaded")) { refreshNav(); rerender(); }
+  });
+  return h("span", {}, input, h("button", { class: "btn btn-sm", onclick: () => input.click() }, "Load profile file"));
+}

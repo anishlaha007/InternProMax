@@ -77,7 +77,7 @@ SKILLS: dict[str, tuple[str, list[str]]] = {
     "Deep Learning": ("ML/Data", ["deep learning", "neural networks", "neural network"]),
     "NLP": ("ML/Data", ["nlp", "natural language processing"]),
     "Computer Vision": ("ML/Data", ["computer vision", "image processing"]),
-    "LLMs": ("ML/Data", ["llm", "llms", "large language models", "large language model", "generative ai", "genai"]),
+    "LLMs": ("ML/Data", ["llm", "llms", "large language models", "large language model", "generative ai", "genai", "gen-ai", "retrieval-augmented", "watsonx"]),
     "Reinforcement Learning": ("ML/Data", ["reinforcement learning"]),
     "PyTorch": ("ML/Data", ["pytorch", "torch"]),
     "TensorFlow": ("ML/Data", ["tensorflow", "keras"]),
@@ -155,11 +155,40 @@ SKILLS: dict[str, tuple[str, list[str]]] = {
     "PCB Design": ("Hardware", ["pcb", "pcb design", "altium", "kicad", "eagle"]),
     "Circuit Design": ("Hardware", ["circuit design", "analog design", "digital design", "circuits", "spice", "ltspice"]),
     "Signal Processing": ("Hardware", ["signal processing", "dsp", "digital signal processing"]),
-    "Arduino": ("Hardware", ["arduino", "raspberry pi"]),
+    "Arduino": ("Hardware", ["arduino"]),
+    "Raspberry Pi": ("Hardware", ["raspberry pi"]),
     "CAD": ("Hardware", ["cad", "solidworks", "autocad", "fusion 360", "creo", "catia", "nx cad"]),
     "Robotics": ("Hardware", ["robotics", "robot", "robots", "motion planning", "slam"]),
-    "Controls": ("Hardware", ["control systems", "controls", "pid", "simulink"]),
+    "Controls": ("Hardware", ["control systems", "controls", "pid", "pid tuning", "simulink", "control theory"]),
     "Computer Architecture": ("Hardware", ["computer architecture", "cpu design", "gpu architecture"]),
+    # ---- aerospace / mechanical
+    "Aerodynamics": ("Aero/Mechanical", ["aerodynamics", "aerodynamic", "aerodynamicist", "aerothermal"]),
+    "Propulsion": ("Aero/Mechanical", ["propulsion", "rocket engine", "rocket engines", "combustion", "injector", "injectors", "turbomachinery", "feed system", "feed systems", "liquid rocket"]),
+    "CFD": ("Aero/Mechanical", ["cfd", "computational fluid dynamics", "ansys fluent", "fluent", "star-ccm+", "starccm", "openfoam", "autodesk cfd"]),
+    "FEA": ("Aero/Mechanical", ["fea", "finite element", "finite element analysis", "ansys mechanical", "abaqus", "nastran", "femap"]),
+    "ANSYS": ("Aero/Mechanical", ["ansys"]),
+    "GD&T": ("Aero/Mechanical", ["gd&t", "geometric dimensioning", "tolerance analysis", "tolerance stack-up"]),
+    "3D Printing": ("Aero/Mechanical", ["3d printing", "3d-printed", "3d printed", "additive manufacturing", "fdm printing"]),
+    "Rapid Prototyping": ("Aero/Mechanical", ["rapid prototyping", "prototyping"]),
+    "Wind Tunnel Testing": ("Aero/Mechanical", ["wind tunnel", "wind-tunnel"]),
+    "Fluid Mechanics": ("Aero/Mechanical", ["fluid mechanics", "fluid dynamics", "hydraulics", "pneumatics"]),
+    "Thermal Analysis": ("Aero/Mechanical", ["thermodynamics", "heat transfer", "thermal analysis", "thermal management", "thermal design"]),
+    "Structural Analysis": ("Aero/Mechanical", ["structural analysis", "stress analysis", "structural design", "aerostructures", "fatigue analysis"]),
+    "GNC": ("Aero/Mechanical", ["gnc", "guidance, navigation", "guidance navigation and control", "flight controls", "flight control", "autopilot", "state estimation", "kalman filter", "kalman filters"]),
+    "Sensor Fusion": ("Aero/Mechanical", ["sensor fusion", "imu", "gps/imu", "sensor integration"]),
+    "PixHawk": ("Aero/Mechanical", ["pixhawk", "px4", "ardupilot", "mission planner", "qgroundcontrol"]),
+    "UAV": ("Aero/Mechanical", ["uav", "uavs", "drone", "drones", "unmanned aerial", "suas", "vtol", "multirotor", "quadcopter"]),
+    "Avionics": ("Aero/Mechanical", ["avionics"]),
+    "Flight Software": ("Aero/Mechanical", ["flight software", "fsw"]),
+    "Monte Carlo Simulation": ("Aero/Mechanical", ["monte carlo"]),
+    "GEANT4": ("Aero/Mechanical", ["geant4"]),
+    "Uncertainty Analysis": ("Aero/Mechanical", ["uncertainty analysis", "error analysis", "uncertainty quantification"]),
+    "Test Engineering": ("Aero/Mechanical", ["test engineering", "hot fire", "hotfire", "test campaign", "test campaigns", "test stand", "data acquisition", "daq"]),
+    "Machining": ("Aero/Mechanical", ["machining", "cnc", "lathe", "milling"]),
+    "Composites": ("Aero/Mechanical", ["composites", "composite layup", "carbon fiber", "carbon-fiber"]),
+    "DFM": ("Aero/Mechanical", ["dfm", "design for manufacturing", "design for manufacturability"]),
+    "LaTeX": ("Tools", ["latex"]),
+    "ROOT": ("Aero/Mechanical", []),
     # ---- quant / finance
     "Quantitative Analysis": ("Quant", ["quantitative analysis", "quantitative research", "quantitative", "quant"]),
     "Trading": ("Quant", ["trading", "market making", "derivatives", "options pricing"]),
@@ -170,7 +199,7 @@ SKILLS: dict[str, tuple[str, list[str]]] = {
     # ---- product / design
     "Product Management": ("Product", ["product management", "product strategy", "roadmap", "roadmaps", "prd", "prds"]),
     "User Research": ("Product", ["user research", "user interviews", "usability testing", "ux research"]),
-    "Figma": ("Product", ["figma", "sketch", "wireframes", "wireframing", "prototyping"]),
+    "Figma": ("Product", ["figma", "sketch", "wireframes", "wireframing"]),
     "UI/UX Design": ("Product", ["ui/ux", "ux design", "ui design", "user experience", "product design"]),
     # ---- soft skills (kept small; used for resume emphasis)
     "Communication": ("Soft skills", ["communication skills", "written communication", "verbal communication"]),
@@ -180,7 +209,7 @@ SKILLS: dict[str, tuple[str, list[str]]] = {
 }
 
 # Aliases matched case-sensitively (short or ambiguous words).
-CASE_SENSITIVE = {"Spark": ["Spark"], "Excel": ["Excel"], "Unity": ["Unity"], "dbt": ["dbt"]}
+CASE_SENSITIVE = {"Spark": ["Spark"], "Excel": ["Excel"], "Unity": ["Unity"], "dbt": ["dbt"], "ROOT": ["ROOT"]}
 # Single letters / common words only matched in list-like contexts ("Python, Go, and R").
 LIST_CONTEXT_ONLY = {"Go": ["Go"], "R": ["R"], "C": ["C"]}
 
@@ -244,6 +273,47 @@ def mentions(text: str, skill: str) -> bool:
     return re.search(_B_LEFT + re.escape(skill.lower()) + _B_RIGHT, text.lower()) is not None
 
 
+# Knowledge a skill (or a major) reasonably demonstrates. Used only to judge fit, never to add skills to a resume.
+IMPLIES: dict[str, list[str]] = {
+    "CFD": ["Fluid Mechanics"],
+    "FEA": ["Structural Analysis"],
+    "ANSYS": ["Structural Analysis"],
+    "PixHawk": ["UAV"],
+    "Sensor Fusion": ["Controls"],
+    "GNC": ["Controls"],
+    "Uncertainty Analysis": ["Data Analysis", "Statistics"],
+    "Monte Carlo Simulation": ["Statistics"],
+    "Pandas": ["Data Analysis"],
+    "PyTorch": ["Machine Learning", "Deep Learning"],
+    "TensorFlow": ["Machine Learning", "Deep Learning"],
+    "React": ["Frontend", "Web Development"],
+    "Django": ["Backend"],
+    "FastAPI": ["Backend", "APIs"],
+    "Flask": ["Backend", "APIs"],
+    "Docker": ["Cloud Computing"],
+}
+MAJOR_IMPLIES: dict[str, list[str]] = {
+    "aerospace": ["Aerodynamics", "Fluid Mechanics", "Thermal Analysis", "Structural Analysis", "Controls", "MATLAB"],
+    "mechanical": ["Fluid Mechanics", "Thermal Analysis", "Structural Analysis", "CAD"],
+    "computer science": ["Data Structures & Algorithms", "Object-Oriented Programming", "Operating Systems"],
+    "computer engineering": ["Data Structures & Algorithms", "Computer Architecture", "Embedded Systems"],
+    "electrical": ["Circuit Design", "Signal Processing"],
+    "industrial": ["Optimization", "Statistics"],
+}
+
+
+def implied(skill_names: list[str], majors: list[str] = ()) -> set[str]:
+    out = {canonical(s) for s in skill_names}
+    for s in list(out):
+        out.update(IMPLIES.get(s, []))
+    for m in majors:
+        low = (m or "").lower()
+        for key, extra in MAJOR_IMPLIES.items():
+            if key in low:
+                out.update(extra)
+    return out
+
+
 # Role families used to match job titles against interests.
 ROLE_FAMILIES: dict[str, list[str]] = {
     "Software Engineering": ["software engineer", "software engineering", "software developer", "software development", "swe", "sde", "developer", "programmer"],
@@ -259,6 +329,11 @@ ROLE_FAMILIES: dict[str, list[str]] = {
     "Embedded / Firmware": ["embedded", "firmware", "microcontroller", "rtos"],
     "Hardware / Electrical": ["hardware", "electrical", "fpga", "asic", "silicon", "chip", "circuit", "rf ", "pcb", "power electronics"],
     "Robotics / Autonomy": ["robotics", "robot", "autonomy", "autonomous", "controls", "perception", "slam"],
+    "Aerospace / Propulsion": ["aerospace", "aeronautics", "aeronautical", "aerodynamics", "propulsion", "rocket", "launch vehicle",
+                               "spacecraft", "satellite", "space systems", "flight", "avionics", "engines", "engine", "hypersonic", "orbital", "drone", "uav"],
+    "Mechanical / Design": ["mechanical", "mechatronics", "mechanical design", "structures", "structural", "thermal", "fluids", "cfd",
+                            "manufacturing", "materials", "composites", "product design engineer"],
+    "Controls / GNC": ["controls", "control systems", "gnc", "guidance", "navigation", "flight controls", "autopilot", "estimation"],
     "Quant / Trading": ["quant", "quantitative", "trading", "trader", "strategist"],
     "Research": ["research", "researcher", "scientist"],
     "Product Management": ["product manager", "product management", "apm", "product intern", "program manager"],

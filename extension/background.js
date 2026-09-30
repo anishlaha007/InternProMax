@@ -117,13 +117,16 @@ async function getContext(msg, sender) {
   };
 }
 
-async function getResume(msg) {
+async function getResume(msg, sender) {
   try {
-    if (msg.jobId) {
-      const status = await api(`/api/jobs/${encodeURIComponent(msg.jobId)}/resume-status`);
+    const st = await tabState(sender.tab?.id);
+    const jobId = msg.jobId || st.jobId;
+    if (!jobId && st.preparing && Date.now() - st.preparing < 60000 && !msg.noWait) return { pending: true };
+    if (jobId) {
+      const status = await api(`/api/jobs/${encodeURIComponent(jobId)}/resume-status`);
       if (status.use_tailored && ["queued", "running"].includes(status.tailored) && !msg.noWait) return { pending: true };
       const variant = status.use_tailored && status.tailored === "ready" ? "tailored" : "auto";
-      const res = await api(`/api/jobs/${encodeURIComponent(msg.jobId)}/resume.pdf?variant=${variant}`, { raw: true });
+      const res = await api(`/api/jobs/${encodeURIComponent(jobId)}/resume.pdf?variant=${variant}`, { raw: true });
       return { b64: toBase64(await res.arrayBuffer()), name: filenameFrom(res, "Resume.pdf"), type: res.headers.get("content-type")?.split(";")[0] || "application/pdf", variant: res.headers.get("x-resume-variant") || variant };
     }
     let res;
@@ -161,6 +164,48 @@ async function markApplied(msg, sender) {
   return out;
 }
 
+const POSTING_TTL = 30 * 60 * 1000;
+
+async function createExternalJob(msg, sender) {
+  const tabId = sender.tab?.id;
+  let st = await tabState(tabId);
+  if (st.jobId) return { job: { id: st.jobId, company: st.company, title: st.title } };
+  // The form page often doesn't show the posting: fall back to the one viewed last in this tab.
+  const stash = st.posting && Date.now() - st.posting.at < POSTING_TTL ? st.posting : null;
+  const usePage = msg.description && msg.description.length >= 200;
+  await setTabState(tabId, { preparing: Date.now() });
+  try {
+    const out = await api("/api/jobs/external", {
+      method: "POST",
+      body: {
+        url: sender.tab?.url || msg.url,
+        posting_url: !usePage && stash ? stash.url : null,
+        company: (stash && !usePage && stash.company) || msg.company,
+        title: (stash && !usePage && stash.title) || msg.title,
+        location: msg.location || (stash && stash.location) || "",
+        description: usePage ? msg.description : (stash ? stash.text : ""),
+        source: usePage ? "page" : stash ? "viewed-posting" : "none",
+      },
+    });
+    st = await setTabState(tabId, { jobId: out.job.id, company: out.job.company, title: out.job.title, url: out.job.url, preparing: 0, external: true });
+    return out;
+  } catch (e) {
+    await setTabState(tabId, { preparing: 0 });
+    return { error: e.message };
+  }
+}
+
+async function ensureJob(sender) {
+  const tabId = sender.tab?.id;
+  const st = await tabState(tabId);
+  if (st.jobId) return { job: { id: st.jobId, company: st.company, title: st.title } };
+  try {
+    return await chrome.tabs.sendMessage(tabId, { type: "PREPARE_JOB" }, { frameId: 0 });
+  } catch {
+    return { job: null };
+  }
+}
+
 async function openJob(msg, sender) {
   const job = msg.job;
   if (msg.apiBase) await adoptApiBase(msg.apiBase);
@@ -186,7 +231,17 @@ async function handle(msg, sender) {
   switch (msg.type) {
     case "GET_CONTEXT": return getContext(msg, sender);
     case "TAB_STATE": return tabState(tabId);
-    case "GET_RESUME": return getResume(msg);
+    case "GET_RESUME": return getResume(msg, sender);
+    case "STASH_POSTING":
+      if (msg.posting?.text) await setTabState(tabId, { posting: { ...msg.posting, at: Date.now() } });
+      return { ok: true };
+    case "CREATE_EXTERNAL_JOB": return createExternalJob(msg, sender);
+    case "ENSURE_JOB": return ensureJob(sender);
+    case "TAILOR_JOB":
+      return api(`/api/jobs/${encodeURIComponent(msg.jobId)}/tailor`, { method: "POST", body: { force: true } }).catch((e) => ({ error: e.message }));
+    case "AUTOFILL_FRAMES_RESUME":
+      if (tabId !== undefined) chrome.tabs.sendMessage(tabId, { type: "REUPLOAD_RESUME" }).catch(() => {});
+      return { ok: true };
     case "SUBMIT_ATTEMPT": await setTabState(tabId, { submitAttemptAt: Date.now(), submitTrigger: msg.trigger }); return { ok: true };
     case "MARK_APPLIED": return markApplied(msg, sender);
     case "OPEN_JOB": return openJob(msg, sender);
@@ -245,6 +300,8 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   const parent = await tabState(tab.openerTabId);
   if (parent.jobId && !parent.applied) {
     await setTabState(tab.id, { jobId: parent.jobId, company: parent.company, title: parent.title, url: parent.url, openedAt: Date.now(), inherited: true });
+  } else if (parent.posting && Date.now() - parent.posting.at < POSTING_TTL) {
+    await setTabState(tab.id, { posting: parent.posting }); // "Apply" opened the form in a new tab
   }
 });
 

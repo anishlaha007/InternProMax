@@ -108,7 +108,8 @@ def analyze(description: str, profile: dict, job: dict | None = None) -> dict:
     if constraints["degree"] and constraints["degree"] in constraints["graduation"]:
         constraints["degree"] = ""
 
-    have = {s.lower() for s in all_skills(profile)}
+    majors = [e.get("major", "") for e in profile.get("education") or []]
+    have = {s.lower() for s in skills.implied(all_skills(profile), majors)}
     wanted = required + preferred
     matched = [s for s in wanted if s.lower() in have]
     missing = [s for s in wanted if s.lower() not in have]
@@ -139,6 +140,16 @@ def analyze(description: str, profile: dict, job: dict | None = None) -> dict:
                 reasons.append(f"GPA requirement {m.group(1)} is above yours")
         except ValueError:
             pass
+
+    auth = profile.get("work_auth") or {}
+    wa = constraints["work_authorization"].lower()
+    if wa:
+        if re.search(r"\bitar\b|u\.?s\.? persons?\b|export control|citizen|security clearance", wa) and not auth.get("us_citizen"):
+            fit -= 25
+            reasons.append("Requires U.S. citizenship / U.S.-person status (ITAR or clearance); check that you qualify")
+        elif auth.get("needs_sponsorship") and re.search(r"(unable|not able|cannot|can't|won't|will not|do not|does not)\s+(to\s+)?(offer\s+|provide\s+)?sponsor|no (visa )?sponsorship", wa):
+            fit -= 30
+            reasons.append("Says it can't sponsor visas, and your profile says you need sponsorship")
 
     advice = []
     for s in missing[:5]:

@@ -55,15 +55,16 @@ def main() -> None:
 
         print(json.dumps(pipeline.analyze_job(args.job_id, force=True), indent=2, default=str))
     else:
-        import os
         import sys
 
         import uvicorn
 
         port = getattr(args, "port", config.PORT)
         host = getattr(args, "host", config.HOST)
-        if host not in ("127.0.0.1", "localhost", "::1") and not os.environ.get("IPM_PASSWORD"):
-            sys.exit(f"Refusing to listen on {host} without a password. Set IPM_PASSWORD (see docs/DEPLOY.md).")
+        from . import auth
+
+        if host not in ("127.0.0.1", "localhost", "::1") and not auth.password():
+            sys.exit(f"Refusing to listen on {host} without a password. Set IPM_PASSWORD or IPM_PASSWORD_FILE (see docs/DEPLOY.md).")
         url = f"http://{host if host not in ('0.0.0.0', '::') else '127.0.0.1'}:{port}"
         print(f"\n  InternProMax dashboard: {url}\n")
         if not getattr(args, "no_browser", False):

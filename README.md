@@ -65,6 +65,16 @@ Chrome will say the extension can "read and change data on all websites". It nee
 4. **Inbox**: paste recruiter emails, or let IMAP sync find them, and accept the suggested status changes.
 5. **Tracker**: board or list view with response rate, interviews and offers. Drag cards between stages and keep notes and a timeline per application.
 
+## Run it on a free server (always on, use it from any device)
+
+Don't want to start it on your laptop every time? [docs/DEPLOY.md](docs/DEPLOY.md) walks through putting it on a free Oracle Cloud or Google Cloud server, reachable only over your private [Tailscale](https://tailscale.com) network and protected by a password:
+
+```bash
+git clone <this repo> && cd InternProMax && sudo ./deploy/install.sh
+```
+
+Then open `http://internpromax:8420` from your laptop or phone, and in the extension's **Options** enter that address and your password. A Docker setup (`docker compose up -d`) is included too.
+
 ## Optional: AI (Claude)
 
 Everything works without AI: built-in analyzers handle posting analysis, tailoring and email classification. To add Claude, put an Anthropic API key in **Settings → AI**, or set the `ANTHROPIC_API_KEY` environment variable. With a key it:
@@ -87,14 +97,16 @@ python -m internpromax                 # dashboard + API (default port 8420; IPM
 python -m internpromax sync --force    # pull listings now
 python -m internpromax analyze JOB_ID  # fetch + analyze one posting
 python -m internpromax import file.json
+python -m internpromax load-profile my-profile.json   # replace your profile from a JSON file
 ```
 
 Data lives in `./data/` (SQLite + your resume file). Set `IPM_DATA_DIR` to put it elsewhere. **Settings → Your data** exports everything as JSON, or your applications as CSV.
 
 ## Privacy & security
 
-- The server binds to `127.0.0.1` only. It rejects requests whose `Host` isn't localhost (blocks DNS rebinding) and rejects state-changing requests from other websites (blocks CSRF). It sends no CORS headers, so other sites can't read your data.
-- The extension only talks to your local server, and only switches to a different local address after checking that it really is InternProMax.
+- By default the server binds to `127.0.0.1` only. It rejects requests whose `Host` isn't allowed (blocks DNS rebinding) and state-changing requests from other websites (blocks CSRF). It sends no CORS headers, so other sites can't read your data.
+- In server mode ([docs/DEPLOY.md](docs/DEPLOY.md)) it also requires a password (`IPM_PASSWORD` or `IPM_PASSWORD_FILE`) and answers only the host names in `IPM_ALLOWED_HOSTS`. It refuses to listen beyond localhost without a password.
+- The extension only talks to the server you connected it to, and only adopts a new address after checking that it really is InternProMax.
 - The Anthropic key and IMAP password are stored in your local database and never shown back in the UI.
 
 ## Development

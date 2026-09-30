@@ -25,7 +25,17 @@ _failures: dict[str, list[float]] = {}
 
 
 def password() -> str | None:
-    return os.environ.get("IPM_PASSWORD") or None
+    """IPM_PASSWORD, or the contents of the file named by IPM_PASSWORD_FILE (no quoting rules to trip over)."""
+    if os.environ.get("IPM_PASSWORD"):
+        return os.environ["IPM_PASSWORD"]
+    path = os.environ.get("IPM_PASSWORD_FILE")
+    if path:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                return fh.read().rstrip("\r\n") or None
+        except OSError:
+            return None
+    return None
 
 
 def enabled() -> bool:

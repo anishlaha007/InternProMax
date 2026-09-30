@@ -1,0 +1,11 @@
+# docker compose up -d   (copy .env.example to .env first)
+services:
+  internpromax:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data
+    ports:
+      # Publish only where you mean to: your Tailscale IP, or 127.0.0.1 behind your own HTTPS proxy.
+      - "${IPM_PUBLISH:-127.0.0.1}:8420:8420"

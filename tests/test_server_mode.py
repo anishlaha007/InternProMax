@@ -83,3 +83,16 @@ def test_refuses_public_bind_without_password(tmp_path):
     out = subprocess.run([sys.executable, "-m", "internpromax", "serve", "--no-browser", "--host", "0.0.0.0"],
                          cwd=config.ROOT, env=env, capture_output=True, text=True, timeout=30)
     assert out.returncode != 0 and "IPM_PASSWORD" in out.stderr
+
+
+def test_password_file(monkeypatch, tmp_path):
+    secret = tmp_path / "pw"
+    secret.write_text("it's p@ss \"q\" \\ $lash `x`\n")
+    monkeypatch.delenv("IPM_PASSWORD", raising=False)
+    monkeypatch.setenv("IPM_PASSWORD_FILE", str(secret))
+    monkeypatch.setattr(config, "ALLOWED_HOSTS", ["*.ts.net"])
+    auth.reset_failures()
+    c = TestClient(app, base_url=SERVER)
+    assert c.get("/api/profile").status_code == 401
+    assert c.post("/api/auth/login", json={"password": "it's p@ss \"q\" \\ $lash `x`"}).status_code == 200
+    assert c.get("/api/profile").status_code == 200

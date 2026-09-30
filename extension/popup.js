@@ -19,7 +19,7 @@ async function render() {
     el("div", {}, el("span", { class: "dot", style: `background:${s.apiOk ? "#16803a" : "#c0392f"}` }),
       s.apiOk ? "Connected to InternProMax" : s.needsLogin ? "Log in to your InternProMax server" : "Can’t reach InternProMax",
       el("div", { class: "muted", style: "font-size:11.5px" }, s.apiBase)),
-    !s.apiOk ? el("div", { class: "box" }, s.needsLogin ? "Your server needs your password. " : ["Start it with ", el("code", {}, "python -m internpromax"), ", or "],
+    !s.apiOk ? el("div", { class: "box" }, s.needsLogin ? "Your server needs your password. " : ["Start it with ", el("code", {}, "./run.sh"), " (or ", el("code", {}, "./run.sh autostart"), " so it starts at login), or "],
       el("a", { href: "#", onclick: (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); } }, s.needsLogin ? "Log in from Options" : "set the address in Options"), ".") : null,
     s.stats ? el("div", { class: "box" },
       el("b", {}, `${s.stats.new_matches || 0} new matches`), el("span", { class: "muted" }, ` · ${s.stats.matches} total`), el("br"),

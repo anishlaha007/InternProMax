@@ -17,6 +17,10 @@ def main() -> None:
     serve.add_argument("--port", type=int, default=config.PORT)
     serve.add_argument("--host", default=config.HOST, help="address to listen on (default 127.0.0.1; use your Tailscale IP on a server)")
     serve.add_argument("--no-browser", action="store_true")
+    serve.add_argument("--log-file", help="write logs to this file (used when it runs in the background)")
+    auto = sub.add_parser("autostart", help="start InternProMax automatically when you log in")
+    auto.add_argument("--off", action="store_true", help="stop starting it automatically")
+    auto.add_argument("--status", action="store_true", help="show whether it's set up and running")
     sync = sub.add_parser("sync", help="pull the latest listings now")
     sync.add_argument("--force", action="store_true", help="ignore the cached ETag")
     imp = sub.add_parser("import", help="import a listings.json file from disk")
@@ -50,6 +54,19 @@ def main() -> None:
         print(f"Loaded profile for {saved['personal'].get('first_name', '')} {saved['personal'].get('last_name', '')}: "
               f"{len(res['experience'])} experiences, {len(res['projects'])} projects, {len(res['activities'])} activities, "
               f"{sum(len(g['items']) for g in res['skills'])} skills ({done['score']}% complete)")
+    elif args.cmd == "autostart":
+        from . import autostart
+
+        if args.status:
+            st = autostart.status()
+            print(f"Starts when you log in: {'yes' if st['installed'] else 'no'}")
+            print(f"Running now: {'yes, ' + st['url'] if st['running'] else 'no'}")
+            for entry in st["entries"]:
+                print(f"  startup entry: {entry}")
+            print(f"  log file: {st['log']}")
+        else:
+            for line in (autostart.uninstall() if args.off else autostart.install()):
+                print(line)
     elif args.cmd == "analyze":
         from . import pipeline
 
@@ -61,6 +78,20 @@ def main() -> None:
 
         port = getattr(args, "port", config.PORT)
         host = getattr(args, "host", config.HOST)
+        log_file = getattr(args, "log_file", None)
+        if log_file:
+            stream = open(log_file, "a", buffering=1, encoding="utf-8")
+            sys.stdout = sys.stderr = stream
+            logging.getLogger().handlers.clear()
+            logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", stream=stream)
+        from . import autostart
+
+        if autostart.running(port):
+            # Already running (e.g. it started when you logged in): just open the dashboard.
+            print(f"\n  InternProMax is already running: http://127.0.0.1:{port}\n")
+            if not getattr(args, "no_browser", False):
+                webbrowser.open(f"http://127.0.0.1:{port}")
+            return
         from . import auth
 
         if host not in ("127.0.0.1", "localhost", "::1") and not auth.password():

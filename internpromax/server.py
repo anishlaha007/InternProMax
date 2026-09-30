@@ -72,8 +72,18 @@ async def lifespan(_app: FastAPI):
     stop = threading.Event()
     if not os.environ.get("IPM_NO_BACKGROUND"):
         threading.Thread(target=_scheduler, args=(stop,), daemon=True, name="ipm-scheduler").start()
+    pid_file = config.ensure_data_dir() / "server.pid"
+    try:
+        pid_file.write_text(str(os.getpid()))
+    except OSError:
+        pass
     yield
     stop.set()
+    try:
+        if pid_file.read_text().strip() == str(os.getpid()):
+            pid_file.unlink()
+    except OSError:
+        pass
 
 
 app = FastAPI(title="InternProMax", version=__version__, lifespan=lifespan)

@@ -39,6 +39,16 @@ python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt 
 
 The dashboard opens at **http://127.0.0.1:8420** and pulls the listings on first launch.
 
+### Start it automatically when you log in
+
+```bash
+./run.sh autostart            # macOS / Linux   (Windows: run.bat autostart)
+./run.sh autostart --status   # is it set up and running?
+./run.sh autostart --off      # stop starting it automatically
+```
+
+After that it runs quietly in the background every time you log in, with nothing to start and no terminal window. Bookmark **http://127.0.0.1:8420**. Running `./run.sh` again just opens the dashboard. Logs go to `data/logs/server.log`.
+
 ### Install the Chrome extension
 
 1. Go to `chrome://extensions` and turn on **Developer mode**.
@@ -94,6 +104,7 @@ In **Settings → Email updates**: host `imap.gmail.com`, your address, and an [
 
 ```bash
 python -m internpromax                 # dashboard + API (default port 8420; IPM_PORT to change)
+python -m internpromax autostart       # start automatically at login (--off to undo, --status to check)
 python -m internpromax sync --force    # pull listings now
 python -m internpromax analyze JOB_ID  # fetch + analyze one posting
 python -m internpromax import file.json

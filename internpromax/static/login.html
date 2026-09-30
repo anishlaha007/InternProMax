@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en" data-ipm-dashboard="1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in · InternProMax</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    .login { max-width: 360px; margin: 14vh auto 0; padding: 0 16px; }
+    .login .card { padding: 24px; }
+    .login .brand { justify-content: center; font-size: 18px; margin-bottom: 18px; }
+  </style>
+</head>
+<body>
+  <div class="login">
+    <div class="brand"><img src="icon.svg" alt="" width="30" height="30"><span>InternProMax</span></div>
+    <form class="card stack" id="form">
+      <label class="field">Password
+        <input id="pw" type="password" autocomplete="current-password" required autofocus>
+      </label>
+      <button class="btn btn-primary" type="submit">Log in</button>
+      <div id="err" class="small" style="color: var(--bad)" role="alert"></div>
+    </form>
+    <p class="small faint" style="text-align:center;margin-top:12px">This is your private InternProMax server.</p>
+  </div>
+  <script type="module">
+    const form = document.getElementById("form");
+    const err = document.getElementById("err");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      err.textContent = "";
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: document.getElementById("pw").value }),
+      });
+      if (res.ok) {
+        location.href = "/";
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      err.textContent = data.detail || "Couldn't log in";
+    });
+  </script>
+</body>
+</html>

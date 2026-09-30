@@ -11,6 +11,9 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 HOST = os.environ.get("IPM_HOST", "127.0.0.1")
 PORT = int(os.environ.get("IPM_PORT", "8420"))
+# Extra hostnames the server answers to when you run it on a server (e.g. your Tailscale name/IP).
+# Entries may be exact ("ipm", "100.101.102.103") or wildcards ("*.ts.net"); "*" disables the check.
+ALLOWED_HOSTS = [h.strip().lower() for h in os.environ.get("IPM_ALLOWED_HOSTS", "").split(",") if h.strip()]
 
 USER_AGENT = "InternProMax/0.1 (+local job tracker)"
 

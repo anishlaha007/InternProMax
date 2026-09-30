@@ -29,13 +29,26 @@ async function dropTab(tabId) {
 
 // ---------------------------------------------------------------- API
 
+async function tokenFor(base) {
+  const { tokens = {} } = await chrome.storage.local.get("tokens");
+  return tokens[new URL(base).origin] || null;
+}
+
 async function api(path, { method = "GET", body, raw = false } = {}) {
   const base = await apiBase();
+  const headers = body !== undefined ? { "Content-Type": "application/json" } : {};
+  const token = await tokenFor(base);
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(base + path, {
     method,
-    headers: body !== undefined ? { "Content-Type": "application/json" } : {},
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+  if (res.status === 401) {
+    const err = new Error("Log in to your InternProMax server: open the extension’s Options and click Connect");
+    err.status = 401;
+    throw err;
+  }
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
     try { detail = (await res.json()).detail || detail; } catch { /* not JSON */ }
@@ -78,6 +91,7 @@ async function getContext(msg, sender) {
   } catch {
     return { apiOk: false };
   }
+  if (health.auth_required && !health.authenticated) return { apiOk: false, needsLogin: true, apiBase: await apiBase() };
   let st = await tabState(tabId);
   let job = null;
   let application = null;
@@ -214,6 +228,28 @@ async function openJob(msg, sender) {
   return { tabId: tab.id };
 }
 
+const LOCAL_ORIGIN = /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/;
+
+async function registerBridge(origin) {
+  // The static bridge only covers localhost; a dashboard on your server needs it registered for that origin.
+  const id = "ipm-bridge-remote";
+  const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [id] }).catch(() => []);
+  if (existing.length) await chrome.scripting.unregisterContentScripts({ ids: [id] }).catch(() => {});
+  if (LOCAL_ORIGIN.test(origin)) return;
+  await chrome.scripting.registerContentScripts([{ id, matches: [`${origin}/*`], js: ["bridge.js"], runAt: "document_start" }]);
+}
+
+async function setServer(base, token) {
+  const origin = new URL(base).origin;
+  const { tokens = {} } = await chrome.storage.local.get("tokens");
+  if (token) tokens[origin] = token;
+  else delete tokens[origin];
+  await chrome.storage.local.set({ apiBase: base.replace(/\/$/, ""), tokens });
+  profileCache = { at: 0, data: null };
+  await registerBridge(origin);
+  refreshBadge();
+}
+
 async function adoptApiBase(origin) {
   // Only switch servers if the page really is an InternProMax dashboard.
   try {
@@ -274,14 +310,22 @@ async function handle(msg, sender) {
       let health = null;
       try { health = await api("/api/health"); } catch { /* offline */ }
       const st = await tabState(msg.tabId);
+      const needsLogin = !!(health && health.auth_required && !health.authenticated);
       let stats = null;
-      if (health) { try { stats = await api("/api/stats"); } catch { /* ignore */ } }
-      return { apiOk: !!health, apiBase: await apiBase(), tab: st, stats };
+      if (health && !needsLogin) { try { stats = await api("/api/stats"); } catch { /* ignore */ } }
+      return { apiOk: !!health && !needsLogin, needsLogin, apiBase: await apiBase(), tab: st, stats };
     }
     case "SET_API_BASE":
       await chrome.storage.local.set({ apiBase: msg.apiBase });
       profileCache = { at: 0, data: null };
       return { ok: true };
+    case "SET_SERVER":
+      try {
+        await setServer(msg.apiBase, msg.token || null);
+        return { ok: true };
+      } catch (e) {
+        return { error: e.message };
+      }
     default:
       return { error: `unknown message ${msg.type}` };
   }

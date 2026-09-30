@@ -51,7 +51,7 @@
   async function doActivate(reason) {
     active = true;
     ctx = await send({ type: "GET_CONTEXT", url: location.href });
-    if (ctx.error && !ctx.apiOk) ctx = { apiOk: false };
+    if (ctx.error && !ctx.apiOk) ctx = { apiOk: false, needsLogin: !!ctx.needsLogin };
     const formHere = looksLikeApplication();
     if (!TOP && formHere) send({ type: "FORM_FOUND" });
     if (TOP && (formHere || ctx.job || reason === "form-in-frame")) showPanel();
@@ -103,7 +103,7 @@
   function showPanel() {
     if (!TOP || IPM.panel.mounted) return;
     IPM.panel.mount({
-      apiOk: !!ctx.apiOk, job: ctx.job, application: ctx.application, applied: !!ctx.tab?.applied || ["applied", "oa", "interviewing", "offer"].includes(ctx.application?.status),
+      apiOk: !!ctx.apiOk, needsLogin: !!ctx.needsLogin, job: ctx.job, application: ctx.application, applied: !!ctx.tab?.applied || ["applied", "oa", "interviewing", "offer"].includes(ctx.application?.status),
       ai: !!ctx.ai, guess: ctx.job ? null : guessJob(), dashboard: !!ctx.apiBase, minimized: false,
     }, {
       onAutofill: () => runAutofill({ auto: false }),

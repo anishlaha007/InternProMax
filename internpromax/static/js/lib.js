@@ -42,6 +42,10 @@ async function request(method, url, body) {
     opts.body = JSON.stringify(body);
   }
   const res = await fetch(url, opts);
+  if (res.status === 401) {
+    location.href = "/login.html"; // server mode: session expired or never logged in
+    throw new Error("Please log in");
+  }
   const type = res.headers.get("content-type") || "";
   const data = type.includes("json") ? await res.json() : await res.text();
   if (!res.ok) {

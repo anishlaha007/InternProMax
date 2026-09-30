@@ -2,7 +2,7 @@
 import { h, clear, api, guard, toast, ago, field, extensionInfo } from "./lib.js";
 
 export async function renderSettings(main, refreshNav) {
-  const [s, meta] = await Promise.all([guard(() => api.get("/api/settings")), guard(() => api.get("/api/meta"))]);
+  const [s, meta, authState] = await Promise.all([guard(() => api.get("/api/settings")), guard(() => api.get("/api/meta")), guard(() => api.get("/api/auth/status"))]);
   if (!s || !meta) return;
   const S = structuredClone(s);
   const reload = () => renderSettings(main, refreshNav);
@@ -102,7 +102,14 @@ export async function renderSettings(main, refreshNav) {
       h("ol", { class: "small", style: { marginTop: "10px" } },
         h("li", {}, "Open chrome://extensions and turn on Developer mode."),
         h("li", {}, "Click “Load unpacked” and choose the extension/ folder in this project."),
+        authState?.auth_required
+          ? h("li", {}, "Open the extension’s Options (right-click its icon → Options), enter ", h("b", {}, location.origin), " and your password, and click Connect.")
+          : null,
         h("li", {}, "Reload this dashboard. The sidebar will say “Extension connected”."))),
+
+    authState?.auth_required ? h("div", { class: "card" }, h("h2", {}, "Server"),
+      h("p", { class: "small muted" }, "This InternProMax is running in server mode with a password."),
+      h("button", { class: "btn btn-sm", onclick: async () => { await api.post("/api/auth/logout"); location.href = "/login.html"; } }, "Log out")) : null,
 
     h("div", { class: "card" }, h("h2", {}, "Your data"),
       h("div", { class: "row wrap" },

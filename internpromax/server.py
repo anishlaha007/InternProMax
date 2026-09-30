@@ -12,12 +12,13 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import Body, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import __version__, ai, ats, config, db, inbox, ingest, pipeline, resume_pdf, skills, tailor, tracker
+from . import __version__, ai, ats, auth, config, db, inbox, ingest, pipeline, resume_pdf, skills, tailor, tracker
 from . import profile as profile_mod
 from .matching import DEGREE_LEVELS, Matcher, job_from_row
 
@@ -80,20 +81,42 @@ app = FastAPI(title="InternProMax", version=__version__, lifespan=lifespan)
 # ------------------------------------------------------------------ security
 
 _LOCAL_HOSTS = {"127.0.0.1", "localhost", "[::1]", "::1"}
+# Reachable without logging in (the login page and what it needs; JS/CSS hold no personal data).
+_PUBLIC_PATHS = {"/api/health", "/api/auth/login", "/api/auth/logout", "/api/auth/status", "/login.html", "/app.css", "/icon.svg"}
+
+
+def _host_allowed(hostname: str, allow_any: bool = True) -> bool:
+    if hostname in _LOCAL_HOSTS:
+        return True
+    for entry in config.ALLOWED_HOSTS:
+        if (entry == "*" and allow_any) or entry == hostname or (entry.startswith("*.") and hostname.endswith(entry[1:])):
+            return True
+    return False
+
+
+def _authed(request: Request) -> bool:
+    return not auth.enabled() or auth.verify(auth.token_from(request.headers, request.cookies))
 
 
 @app.middleware("http")
-async def local_only(request: Request, call_next):
+async def guard(request: Request, call_next):
     host = (request.headers.get("host") or "").lower()
     hostname = host.rsplit(":", 1)[0] if not host.startswith("[") else host.split("]")[0] + "]"
-    if hostname not in _LOCAL_HOSTS:
-        return JSONResponse({"detail": "InternProMax only answers on localhost"}, status_code=403)
+    if not _host_allowed(hostname):
+        return JSONResponse({"detail": "This host name isn't allowed (set IPM_ALLOWED_HOSTS)"}, status_code=403)
     origin = request.headers.get("origin")
     if origin and request.method not in ("GET", "HEAD", "OPTIONS"):
-        ok = origin.startswith("chrome-extension://") or re.fullmatch(
-            r"https?://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?", origin) is not None
+        same_site = re.sub(r"^https?://", "", origin).lower() == host
+        origin_host = (urlparse(origin).hostname or "").lower()
+        # a proxy (e.g. `tailscale serve`) may rewrite Host, so also accept origins you listed explicitly
+        ok = origin.startswith("chrome-extension://") or same_site or _host_allowed(origin_host, allow_any=False)
         if not ok:
             return JSONResponse({"detail": "Cross-site request blocked"}, status_code=403)
+    path = request.url.path
+    if auth.enabled() and path not in _PUBLIC_PATHS and not path.startswith("/js/") and not _authed(request):
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "Log in first", "login": True}, status_code=401)
+        return RedirectResponse("/login.html", status_code=303)
     return await call_next(request)
 
 
@@ -132,13 +155,47 @@ def _display_name(profile: dict) -> str:
 # ------------------------------------------------------------------ meta / health
 
 @app.get("/api/health")
-def health():
+def health(request: Request):
+    if not _authed(request):
+        return {"ok": True, "app": "internpromax", "version": __version__, "auth_required": True, "authenticated": False}
     with db.session() as conn:
         settings = db.get_settings(conn)
         n = conn.execute("SELECT count(*) FROM jobs").fetchone()[0]
         last = db.kv_get(conn, "last_sync")
     return {"ok": True, "app": "internpromax", "version": __version__, "ai": ai.available(settings),
-            "jobs": n, "last_sync": last, "sync_running": _sync_state["running"]}
+            "jobs": n, "last_sync": last, "sync_running": _sync_state["running"],
+            "auth_required": auth.enabled(), "authenticated": True}
+
+
+# ------------------------------------------------------------------ login (server mode)
+
+@app.get("/api/auth/status")
+def auth_status(request: Request):
+    return {"auth_required": auth.enabled(), "authenticated": _authed(request)}
+
+
+@app.post("/api/auth/login")
+def login(request: Request, payload: dict = Body(default={})):
+    if not auth.enabled():
+        return {"ok": True, "token": None, "auth_required": False}
+    client = request.client.host if request.client else "unknown"
+    if not auth.attempt_allowed(client):
+        raise HTTPException(429, "Too many wrong passwords. Wait 10 minutes and try again.")
+    if not auth.check_password(str(payload.get("password") or "")):
+        auth.record_failure(client)
+        raise HTTPException(401, "Wrong password")
+    token = auth.issue()
+    res = JSONResponse({"ok": True, "token": token, "auth_required": True})
+    https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    res.set_cookie(auth.COOKIE, token, max_age=auth.TTL, httponly=True, samesite="lax", secure=https)
+    return res
+
+
+@app.post("/api/auth/logout")
+def logout():
+    res = JSONResponse({"ok": True})
+    res.delete_cookie(auth.COOKIE)
+    return res
 
 
 @app.get("/api/meta")

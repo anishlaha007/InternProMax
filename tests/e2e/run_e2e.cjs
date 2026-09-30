@@ -16,6 +16,10 @@ const API = `http://127.0.0.1:${API_PORT}`;
 const SITE = `http://jobs.acme.test:${SITE_PORT}`;
 const OUT = process.env.E2E_OUT || fs.mkdtempSync(path.join(os.tmpdir(), "ipm-e2e-out-"));
 const PY = process.env.PYTHON || "python3";
+// E2E_SERVER_MODE=1 runs the same flow against a password-protected server.
+const SERVER_MODE = !!process.env.E2E_SERVER_MODE;
+const PASSWORD = "e2e-password";
+let AUTH = {};
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
@@ -32,7 +36,8 @@ async function until(fn, timeout = 20000, every = 250) {
   }
   return last;
 }
-const getJSON = async (p) => (await fetch(API + p)).json();
+const apiFetch = (p) => fetch(API + p, { headers: AUTH });
+const getJSON = async (p) => (await apiFetch(p)).json();
 
 function staticServer() {
   return http.createServer((req, res) => {
@@ -46,7 +51,7 @@ function staticServer() {
 
 (async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "ipm-e2e-data-"));
-  const env = { ...process.env, IPM_DATA_DIR: dataDir, IPM_NO_BACKGROUND: "1" };
+  const env = { ...process.env, IPM_DATA_DIR: dataDir, IPM_NO_BACKGROUND: "1", ...(SERVER_MODE ? { IPM_PASSWORD: PASSWORD } : {}) };
   execFileSync(PY, [path.join(__dirname, "seed.py"), SITE], { env, stdio: "inherit" });
   const server = spawn(PY, ["-m", "internpromax", "serve", "--no-browser", "--port", String(API_PORT)], { cwd: ROOT, env, stdio: ["ignore", "pipe", "pipe"] });
   let serverLog = "";
@@ -57,6 +62,11 @@ function staticServer() {
   let context;
   try {
     await until(async () => (await getJSON("/api/health")).ok, 20000);
+    if (SERVER_MODE) {
+      const login = await (await fetch(`${API}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: PASSWORD }) })).json();
+      AUTH = { Authorization: `Bearer ${login.token}` };
+      check("server mode: API refuses requests without a login", (await fetch(`${API}/api/profile`)).status === 401);
+    }
     context = await chromium.launchPersistentContext(profileDir, {
       channel: "chromium",
       headless: true,
@@ -72,6 +82,27 @@ function staticServer() {
     // ---------- 1. Apply from the dashboard (Greenhouse-style form, full page navigation on submit)
     const dash = await context.newPage();
     await dash.goto(`${API}/#/jobs`);
+    if (SERVER_MODE) {
+      await dash.waitForURL(/login\.html/);
+      check("server mode: dashboard asks for the password", dash.url().includes("/login.html"));
+      await dash.fill("#pw", PASSWORD);
+      await Promise.all([dash.waitForURL((u) => !u.pathname.includes("login")), dash.click("button[type=submit]")]);
+      await dash.goto(`${API}/#/jobs`);
+    }
+    if (SERVER_MODE) {
+      // Then connect the extension the way a user would: Options page → address + password → Connect.
+      const extId = new URL(worker.url()).host;
+      const opt = await context.newPage();
+      await opt.goto(`chrome-extension://${extId}/options.html`);
+      await opt.fill("#api", API);
+      await opt.fill("#pw", PASSWORD);
+      await opt.click("#save");
+      const connected = await until(() => opt.evaluate(() => /logged in/.test(document.getElementById("status").textContent)), 10000);
+      check("server mode: extension logged in from its Options page", !!connected, await opt.evaluate(() => document.getElementById("status").textContent));
+      await opt.close();
+      await dash.reload();
+    }
+
     const detected = await until(() => dash.evaluate(() => document.documentElement.dataset.ipmExtension), 10000);
     check("dashboard detects the extension", !!detected, detected);
     await until(() => worker.evaluate(async (api) => (await chrome.storage.local.get("apiBase")).apiBase === api, API), 10000);
@@ -119,7 +150,7 @@ function staticServer() {
     if (details) check("analysis found required skills", (details.details.analysis.required_skills || []).includes("Python"), (details.details.analysis.required_skills || []).join(", "));
     const tailored = await until(async () => { const d = await getJSON("/api/jobs/e2e-greenhouse"); return d.resume?.status === "ready" && d.resume; }, 30000, 500);
     check("tailored resume generated for this posting", !!tailored, tailored ? tailored.method : "");
-    const tailoredPdf = Buffer.from(await (await fetch(`${API}/api/jobs/e2e-greenhouse/resume.pdf?variant=tailored`)).arrayBuffer());
+    const tailoredPdf = Buffer.from(await (await apiFetch("/api/jobs/e2e-greenhouse/resume.pdf?variant=tailored")).arrayBuffer());
     const attachedBytes = await gh.evaluate(async () => Array.from(new Uint8Array(await document.querySelector("#resume").files[0].arrayBuffer())));
     check("the tailored version is the one attached", attachedBytes.length === tailoredPdf.length, `${attachedBytes.length} vs ${tailoredPdf.length} bytes`);
     await gh.screenshot({ path: path.join(OUT, "greenhouse-filled.png"), fullPage: false });
@@ -184,7 +215,7 @@ function staticServer() {
       check("unlisted job: posting analyzed", !!extDetails && extDetails.analysis.required_skills.includes("CAD"), extDetails ? extDetails.analysis.required_skills.join(", ") : "");
       await until(() => ext.evaluate(() => document.querySelector("#cv").files.length === 1), 60000, 500);
       const extTailored = await until(async () => (await getJSON(`/api/jobs/${extJob.id}`)).resume?.status === "ready", 30000, 500);
-      const extPdf = Buffer.from(await (await fetch(`${API}/api/jobs/${extJob.id}/resume.pdf?variant=tailored`)).arrayBuffer());
+      const extPdf = Buffer.from(await (await apiFetch(`/api/jobs/${extJob.id}/resume.pdf?variant=tailored`)).arrayBuffer());
       const extBytes = await ext.evaluate(async () => Array.from(new Uint8Array(await document.querySelector("#cv").files[0].arrayBuffer())));
       check("unlisted job: tailored resume attached", !!extTailored && extBytes.length === extPdf.length, `${extBytes.length} vs ${extPdf.length} bytes`);
       await ext.screenshot({ path: path.join(OUT, "unlisted-apply.png") });
@@ -204,7 +235,7 @@ function staticServer() {
     if (embJob && frame) {
       await until(() => frame.evaluate(() => document.querySelector("#resume").files.length === 1), 60000, 500);
       await until(async () => (await getJSON(`/api/jobs/${embJob.id}`)).resume?.status === "ready", 30000, 500);
-      const embPdf = Buffer.from(await (await fetch(`${API}/api/jobs/${embJob.id}/resume.pdf?variant=tailored`)).arrayBuffer());
+      const embPdf = Buffer.from(await (await apiFetch(`/api/jobs/${embJob.id}/resume.pdf?variant=tailored`)).arrayBuffer());
       const embBytes = await frame.evaluate(async () => Array.from(new Uint8Array(await document.querySelector("#resume").files[0].arrayBuffer())));
       check("embedded form: tailored resume attached in the iframe", embBytes.length === embPdf.length, `${embBytes.length} vs ${embPdf.length} bytes`);
       await emb.screenshot({ path: path.join(OUT, "embedded.png") });

@@ -91,8 +91,9 @@
     const needs = (s.needsYou || []).filter((n) => n.label);
     const body = el("div", { class: "body" },
       el("div", { class: "row", style: "justify-content:space-between" }, jobBlock, status),
-      !s.apiOk ? el("div", { class: "box small" }, el("span", { class: "chip bad" }, "Offline"),
-        " Start InternProMax (python -m internpromax) so I can fill and track.") : null,
+      !s.apiOk ? el("div", { class: "box small" }, el("span", { class: "chip bad" }, s.needsLogin ? "Log in" : "Offline"),
+        s.needsLogin ? " Open the InternProMax extension’s Options and click Connect to log in to your server."
+          : " Start InternProMax (python -m internpromax) or check the server address in the extension’s Options.") : null,
       el("div", { class: "row" },
         el("button", { class: "btn primary", disabled: !s.apiOk || s.busy ? "" : null, onclick: () => handlers.onAutofill() },
           s.busy ? "Filling…" : s.fillCount ? "Fill again" : "Autofill"),

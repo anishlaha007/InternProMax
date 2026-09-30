@@ -1,0 +1,55 @@
+"""CLI: `python -m internpromax [serve|sync|import FILE|tailor JOB_ID]`."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import webbrowser
+
+from . import config
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(prog="internpromax", description="Internship finder, resume tailor and application tracker")
+    sub = parser.add_subparsers(dest="cmd")
+    serve = sub.add_parser("serve", help="run the dashboard + API (default)")
+    serve.add_argument("--port", type=int, default=config.PORT)
+    serve.add_argument("--no-browser", action="store_true")
+    sync = sub.add_parser("sync", help="pull the latest listings now")
+    sync.add_argument("--force", action="store_true", help="ignore the cached ETag")
+    imp = sub.add_parser("import", help="import a listings.json file from disk")
+    imp.add_argument("file")
+    an = sub.add_parser("analyze", help="fetch + analyze one job posting and print the result")
+    an.add_argument("job_id")
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    if args.cmd == "sync":
+        from . import ingest
+
+        print(json.dumps(ingest.sync_all(force=args.force), indent=2))
+    elif args.cmd == "import":
+        from . import ingest
+
+        print(json.dumps(ingest.import_file(args.file), indent=2))
+    elif args.cmd == "analyze":
+        from . import pipeline
+
+        print(json.dumps(pipeline.analyze_job(args.job_id, force=True), indent=2, default=str))
+    else:
+        import uvicorn
+
+        port = getattr(args, "port", config.PORT)
+        url = f"http://{config.HOST}:{port}"
+        print(f"\n  InternProMax dashboard: {url}\n")
+        if not getattr(args, "no_browser", False):
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
+        uvicorn.run("internpromax.server:app", host=config.HOST, port=port, log_level="info")
+
+
+if __name__ == "__main__":
+    main()

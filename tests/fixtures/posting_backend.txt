@@ -1,0 +1,25 @@
+Software Engineer Intern, Backend (Summer 2027)
+
+About the team
+Our Payments Infrastructure team builds the APIs that move money for millions of businesses. As an intern you will own a project end to end.
+
+What you'll do
+• Design, build and ship backend services in Go or Java that handle real production traffic
+• Write clear REST APIs and work with PostgreSQL and Kafka
+• Improve reliability of distributed systems through testing, monitoring and on-call shadowing
+• Collaborate with engineers and product managers on technical design docs
+
+Minimum qualifications
+• Currently pursuing a Bachelor's or Master's degree in Computer Science or a related field, graduating between December 2027 and June 2028
+• Experience with at least one of Go, Java, Python or C++
+• Solid understanding of data structures and algorithms
+• Experience building projects outside of class (internships, open source, side projects)
+
+Preferred qualifications
+• Experience with Docker, Kubernetes or AWS
+• Familiarity with distributed systems concepts such as consensus and replication
+• Prior internship experience
+
+Benefits
+Competitive pay ($50/hr), housing stipend.
+We are an equal opportunity employer. We are unable to sponsor visas for this role.

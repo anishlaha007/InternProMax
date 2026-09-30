@@ -1,0 +1,49 @@
+{
+  "personal": {"first_name": "Alex", "last_name": "Rivera", "email": "alex.rivera@example.edu", "phone": "(412) 555-0199",
+               "linkedin": "https://linkedin.com/in/alexrivera", "github": "https://github.com/alexrivera", "website": "",
+               "address": "123 Forbes Ave", "city": "Pittsburgh", "state": "PA", "zip": "15213", "country": "United States"},
+  "education": [{"school": "University of Pittsburgh", "degree": "Bachelor of Science", "degree_level": "Bachelor's",
+                 "major": "Computer Science", "minor": "Mathematics", "gpa": "3.7", "grad_month": "May", "grad_year": "2028",
+                 "location": "Pittsburgh, PA",
+                 "coursework": ["Data Structures", "Operating Systems", "Machine Learning", "Distributed Systems", "Discrete Math"],
+                 "highlights": []}],
+  "work_auth": {"authorized_us": true, "needs_sponsorship": false, "us_citizen": true, "over_18": true, "willing_to_relocate": true},
+  "preferences": {"terms": ["Summer 2027"], "categories": ["Software Engineering", "Data Science, AI & ML"],
+                  "interests": ["Software Engineering", "Backend", "Machine Learning / AI"],
+                  "locations": ["Bay Area", "NYC", "Remote"], "dream_companies": ["Stripe"]},
+  "resume": {
+    "summary": "",
+    "experience": [
+      {"id": "exp-1", "company": "Acme Health", "title": "Software Engineering Intern", "location": "Pittsburgh, PA", "start": "May 2026", "end": "Aug 2026",
+       "bullets": ["Built a patient scheduling dashboard in React and TypeScript used by 40 clinic staff",
+                   "Designed REST APIs in Python (FastAPI) backed by PostgreSQL, cutting page load time by 35%",
+                   "Containerized services with Docker and set up GitHub Actions CI for automated testing"]},
+      {"id": "exp-2", "company": "Pitt CS Department", "title": "Undergraduate Teaching Assistant", "location": "Pittsburgh, PA", "start": "Jan 2026", "end": "Present",
+       "bullets": ["Held weekly office hours for 120 students in Data Structures (Java)",
+                   "Wrote autograder test suites in Python for 6 programming assignments"]}
+    ],
+    "projects": [
+      {"id": "pro-1", "name": "ChatNotes", "role": "", "link": "https://github.com/alexrivera/chatnotes", "start": "Jan 2026", "end": "Mar 2026",
+       "tech": ["Python", "PyTorch", "Hugging Face", "FastAPI"],
+       "bullets": ["Fine-tuned a small transformer to summarize lecture transcripts; served it behind a FastAPI endpoint",
+                   "Evaluated summaries with ROUGE and a 50-sample human study"]},
+      {"id": "pro-2", "name": "RaftKV", "role": "", "link": "", "start": "Sep 2025", "end": "Dec 2025",
+       "tech": ["Go", "gRPC", "Docker"],
+       "bullets": ["Implemented a replicated key-value store in Go using the Raft consensus algorithm",
+                   "Tested leader election and log replication under simulated network partitions"]},
+      {"id": "pro-3", "name": "Pixel Painter", "role": "", "link": "", "start": "", "end": "2024",
+       "tech": ["JavaScript", "HTML", "CSS"],
+       "bullets": ["Browser drawing app with undo/redo and PNG export"]}
+    ],
+    "activities": [
+      {"id": "act-1", "company": "Pitt Hackathon Club", "title": "Organizer", "location": "", "start": "2025", "end": "Present",
+       "bullets": ["Co-organized a 300-person hackathon and ran sponsor workshops"]}
+    ],
+    "skills": [
+      {"category": "Languages", "items": ["Python", "Java", "TypeScript", "JavaScript", "Go", "SQL", "C"]},
+      {"category": "Frameworks & Tools", "items": ["React", "FastAPI", "PyTorch", "Docker", "Git", "PostgreSQL", "Linux"]}
+    ],
+    "awards": [{"title": "Dean's List", "detail": "Fall 2025, Spring 2026"}]
+  },
+  "answers": [{"question": "Why are you interested in this role?", "answer": "I love building reliable backend systems."}]
+}

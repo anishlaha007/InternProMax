@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Job Application for Software Engineer Intern at Acme Robotics</title></head>
+<body>
+<main>
+  <h1>Software Engineer Intern (Summer 2027)</h1>
+  <div id="content">
+    <h3>About the role</h3>
+    <p>Acme Robotics builds warehouse robots. As a Software Engineer Intern on the Fleet Platform team you will build backend services that coordinate thousands of robots in production.</p>
+    <h3>What you'll do</h3>
+    <ul>
+      <li>Design and ship backend services in Go and Python that handle real production traffic</li>
+      <li>Build REST APIs backed by PostgreSQL and deploy them with Docker and Kubernetes</li>
+      <li>Improve reliability of our distributed systems through testing and monitoring</li>
+    </ul>
+    <h3>Minimum qualifications</h3>
+    <ul>
+      <li>Pursuing a Bachelor's degree in Computer Science, graduating between December 2027 and June 2028</li>
+      <li>Experience with Python, Go or Java</li>
+      <li>Experience building projects outside of class such as side projects or open source</li>
+    </ul>
+    <h3>Preferred qualifications</h3>
+    <ul><li>Experience with Kubernetes, AWS or distributed consensus</li></ul>
+  </div>
+  <h2>Apply for this job</h2>
+  <form id="application_form" action="/confirmation.html" method="get">
+    <label for="first_name">First Name *</label><input id="first_name" name="job_application[first_name]" type="text" required>
+    <label for="last_name">Last Name *</label><input id="last_name" name="job_application[last_name]" type="text" required>
+    <label for="email">Email *</label><input id="email" name="job_application[email]" type="text" required>
+    <label for="phone">Phone</label><input id="phone" name="job_application[phone]" type="text">
+    <div class="field"><label>Resume/CV *</label>
+      <input id="resume" name="resume" type="file" accept=".pdf,.doc,.docx" required>
+    </div>
+    <div class="field"><label for="question_1">LinkedIn Profile</label><input id="question_1" name="q1" type="text"></div>
+    <div class="field"><label for="question_2">Website</label><input id="question_2" name="q2" type="text"></div>
+    <div class="field"><label for="question_3">School *</label><input id="question_3" name="q3" type="text"></div>
+    <div class="field"><label for="question_4">Degree</label>
+      <select id="question_4" name="q4"><option value="">Select...</option><option>High School</option><option>Associate's Degree</option><option>Bachelor's Degree</option><option>Master's Degree</option><option>Doctorate</option></select></div>
+    <div class="field"><label for="question_5">Expected graduation date</label><input id="question_5" name="q5" type="text" placeholder="MM/YYYY"></div>
+    <div class="field"><label for="question_6">Are you legally authorized to work in the United States? *</label>
+      <select id="question_6" name="q6"><option value="">Select...</option><option value="1">Yes</option><option value="0">No</option></select></div>
+    <div class="field"><label for="question_7">Will you now or in the future require sponsorship for employment visa status (e.g. H-1B)? *</label>
+      <select id="question_7" name="q7"><option value="">Select...</option><option value="1">Yes</option><option value="0">No</option></select></div>
+    <div class="field"><label for="question_8">How did you hear about this job?</label><input id="question_8" name="q8" type="text"></div>
+    <div class="field"><label for="question_9">Why do you want to work at Acme Robotics? *</label><textarea id="question_9" name="q9" required></textarea></div>
+    <h3>Voluntary Self-Identification</h3>
+    <div class="field"><label for="gender">Gender</label>
+      <select id="gender" name="gender"><option value="">Please select</option><option value="1">Male</option><option value="2">Female</option><option value="3">Decline To Self Identify</option></select></div>
+    <div class="field"><label for="hispanic_ethnicity">Are you Hispanic/Latino?</label>
+      <select id="hispanic_ethnicity" name="hispanic"><option value="">Please select</option><option>Yes</option><option>No</option><option>Decline To Self Identify</option></select></div>
+    <div class="field"><label for="veteran_status">Veteran Status</label>
+      <select id="veteran_status" name="veteran"><option value="">Please select</option><option>I am not a protected veteran</option><option>I identify as one or more of the classifications of protected veteran</option><option>I don't wish to answer</option></select></div>
+    <div class="field"><label for="disability_status">Disability Status</label>
+      <select id="disability_status" name="disability"><option value="">Please select</option><option>Yes, I have a disability, or have had one in the past</option><option>No, I do not have a disability and have not had one in the past</option><option>I do not want to answer</option></select></div>
+    <label><input type="checkbox" name="consent" value="1"> I agree to the privacy policy</label>
+    <button type="submit" id="submit_app">Submit application</button>
+  </form>
+</main>
+</body>
+</html>

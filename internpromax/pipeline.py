@@ -15,6 +15,7 @@ log = logging.getLogger(__name__)
 
 _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ipm-pipeline")
 _inflight: set[tuple[str, str]] = set()
+_rerun: dict[tuple[str, str], bool] = {}  # requested while running: run again afterwards (value = force)
 _lock = threading.Lock()
 
 
@@ -85,12 +86,15 @@ def analyze_job(job_id: str, force: bool = False) -> dict:
         with db.session() as conn:
             set_details(conn, job_id, status="fetching", error=None)
         result = postings.fetch(job.get("url") or "") if job.get("url") else {"text": None, "error": "no URL"}
-        if not result.get("text"):
+        if result.get("text"):
+            text = result["text"]
+            store_description(job_id, text, result["method"])
+        else:
             with db.session() as conn:
-                set_details(conn, job_id, status="needs_capture", error=result.get("error"))
-                return get_details(conn, job_id)
-        text = result["text"]
-        store_description(job_id, text, result["method"])
+                text = get_details(conn, job_id).get("description")  # the extension may have captured it meanwhile
+                if not text:
+                    set_details(conn, job_id, status="needs_capture", error=result.get("error"))
+                    return get_details(conn, job_id)
 
     with db.session() as conn:
         set_details(conn, job_id, status="analyzing", error=None)
@@ -179,6 +183,9 @@ def _run(kind: str, job_id: str, force: bool) -> None:
     finally:
         with _lock:
             _inflight.discard((kind, job_id))
+            again = _rerun.pop((kind, job_id), None)
+        if again is not None:
+            queue(job_id, kind, force=again)
 
 
 def queue(job_id: str, kind: str = "analyze", force: bool = False) -> bool:
@@ -186,6 +193,7 @@ def queue(job_id: str, kind: str = "analyze", force: bool = False) -> bool:
     key = (kind, job_id)
     with _lock:
         if key in _inflight:
+            _rerun[key] = _rerun.get(key, False) or force
             return False
         _inflight.add(key)
     if kind == "tailor":

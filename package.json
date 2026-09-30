@@ -1,0 +1,11 @@
+{
+  "name": "internpromax-e2e",
+  "private": true,
+  "description": "Browser end-to-end test for the InternProMax extension + backend",
+  "scripts": {
+    "e2e": "node tests/e2e/run_e2e.cjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
+}

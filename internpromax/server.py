@@ -86,7 +86,7 @@ _LOCAL_HOSTS = {"127.0.0.1", "localhost", "[::1]", "::1"}
 async def local_only(request: Request, call_next):
     host = (request.headers.get("host") or "").lower()
     hostname = host.rsplit(":", 1)[0] if not host.startswith("[") else host.split("]")[0] + "]"
-    if hostname not in _LOCAL_HOSTS and hostname != "testserver":
+    if hostname not in _LOCAL_HOSTS:
         return JSONResponse({"detail": "InternProMax only answers on localhost"}, status_code=403)
     origin = request.headers.get("origin")
     if origin and request.method not in ("GET", "HEAD", "OPTIONS"):
@@ -477,7 +477,16 @@ def capture_description(job_id: str, payload: dict = Body(...)):
     if details.get("description") and not payload.get("force") and details.get("status") not in ("needs_capture", "error"):
         return {"stored": False, "reason": "already have the description"}
     pipeline.store_description(job_id, text, payload.get("source") or "captured")
-    pipeline.queue(job_id, "analyze", force=True)
+    with db.session() as conn:
+        pipeline.set_details(conn, job_id, analysis=None, analysis_method=None, analyzed_at=None)
+        settings = db.get_settings(conn)
+        opened = conn.execute("SELECT opened_at FROM job_state WHERE job_id=?", (job_id,)).fetchone()
+        resume = pipeline.latest_resume(conn, job_id)
+    # If you're applying right now, rebuild the tailored resume from the real posting.
+    if settings.get("auto_tailor_on_apply") and opened and opened["opened_at"] and (not resume or resume["status"] != "ready"):
+        pipeline.queue(job_id, "tailor")
+    else:
+        pipeline.queue(job_id, "analyze", force=True)
     return {"stored": True}
 
 

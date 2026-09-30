@@ -184,7 +184,7 @@ def stats(conn) -> dict:
     now = db.now()
     for i in range(7, -1, -1):
         start, end = now - (i + 1) * 7 * 86400, now - i * 7 * 86400
-        n = conn.execute("SELECT count(*) FROM applications WHERE applied_at>=? AND applied_at<?", (start, end)).fetchone()[0]
+        n = conn.execute("SELECT count(*) FROM applications WHERE applied_at>? AND applied_at<=?", (start, end)).fetchone()[0]
         weeks.append({"start": start, "count": n})
     return {
         "counts": counts,

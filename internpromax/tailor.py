@@ -196,7 +196,8 @@ def check_bullets(new_bullets: list[str], original: dict, label: str, warnings: 
         extra = _numbers(b) - allowed
         if extra:
             fallback = _closest(b, [o for o in originals if o not in out])
-            warnings.append(f"{label}: kept your original wording for one bullet (the rewrite added {', '.join(sorted(extra))})")
+            shown = [m.group(0).strip() for m in _NUM.finditer(b) if re.sub(r"[\s,]", "", m.group(0)).lower() in extra]
+            warnings.append(f"{label}: kept your original wording for one bullet (the rewrite added {', '.join(shown)})")
             if fallback:
                 out.append(fallback)
             continue

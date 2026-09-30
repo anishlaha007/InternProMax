@@ -330,7 +330,10 @@ def list_jobs(view: str = "matches", q: str = "", term: str = "", category: str 
     with db.session() as conn:
         profile = profile_mod.get(conn)
         seen_at = db.kv_get(conn, "feed_seen_at", 0)
-        rows = conn.execute(JOB_QUERY).fetchall()
+        # Closed postings only matter if you've already acted on them (or asked to see them).
+        extra = "" if not profile["preferences"].get("hide_closed", True) else \
+            " AND (j.active = 1 OR a.id IS NOT NULL OR coalesce(s.hidden, 0) = 1)"
+        rows = conn.execute(JOB_QUERY + extra).fetchall()
     m = Matcher(profile)
     ql = q.strip().lower()
     counts = {"matches": 0, "filtered": 0, "hidden": 0, "saved": 0, "applied": 0, "new": 0}
@@ -414,7 +417,8 @@ def job_detail(job_id: str):
         profile = profile_mod.get(conn)
         details = pipeline.get_details(conn, job_id)
         state = conn.execute("SELECT * FROM job_state WHERE job_id=?", (job_id,)).fetchone()
-        app_row = tracker.find(conn, job_id=job_id)
+        found = tracker.find(conn, job_id=job_id)
+        app_row = tracker.get(conn, found["id"]) if found else None
         resume = pipeline.latest_resume(conn, job_id)
     fit = (details.get("analysis") or {}).get("fit_score")
     scored = Matcher(profile).score(job, ai_fit=fit)

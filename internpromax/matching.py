@@ -6,6 +6,7 @@ import json
 import re
 import time
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 from . import skills
 from .profile import all_skills, primary_education
@@ -54,6 +55,17 @@ def _now() -> float:
     return time.time()
 
 
+@lru_cache(maxsize=1024)
+def _word(term: str) -> re.Pattern:
+    return re.compile(r"(?<![a-z])" + re.escape(term) + r"(?![a-z])")
+
+
+@lru_cache(maxsize=64)
+def _region(name: str) -> re.Pattern:
+    return re.compile(r"(?<![a-z])(?:" + "|".join(re.escape(c) for c in REGIONS[name]) + r")(?![a-z])")
+
+
+@lru_cache(maxsize=4096)
 def parse_location(loc: str) -> dict:
     raw = loc.strip()
     low = raw.lower()
@@ -91,10 +103,10 @@ def location_matches(pref: str, loc: dict) -> bool:
     if p in STATE_BY_NAME:
         return loc["state"] == STATE_BY_NAME[p]
     if p in REGIONS:
-        return any(re.search(r"(?<![a-z])" + re.escape(c) + r"(?![a-z])", loc["text"]) for c in REGIONS[p])
+        return _region(p).search(loc["text"]) is not None
     target = CITY_ALIASES.get(p, pref).lower()
     city = target.split(",")[0].strip()
-    return re.search(r"(?<![a-z])" + re.escape(city) + r"(?![a-z])", loc["text"]) is not None
+    return _word(city).search(loc["text"]) is not None
 
 
 @dataclass

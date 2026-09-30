@@ -105,6 +105,9 @@ def analyze(description: str, profile: dict, job: dict | None = None) -> dict:
         "other": [],
     }
 
+    if constraints["degree"] and constraints["degree"] in constraints["graduation"]:
+        constraints["degree"] = ""
+
     have = {s.lower() for s in all_skills(profile)}
     wanted = required + preferred
     matched = [s for s in wanted if s.lower() in have]
